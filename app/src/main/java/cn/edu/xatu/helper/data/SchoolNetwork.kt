@@ -22,7 +22,8 @@ object SchoolUrls {
     val login = "https://authserver.xatu.edu.cn/authserver/login".toHttpUrl().newBuilder().addQueryParameter("service", eams + "homeExt.action").build().toString()
     fun trusted(url: String): Boolean = runCatching {
         val uri = url.toHttpUrl()
-        (uri.scheme == "https" && (uri.host == "xatu.edu.cn" || uri.host.endsWith(".xatu.edu.cn"))) || (uri.scheme == "http" && uri.host == "jwgl2018.xatu.edu.cn")
+        (uri.scheme == "https" && (uri.host == "xatu.edu.cn" || uri.host.endsWith(".xatu.edu.cn"))) ||
+            (uri.scheme == "http" && uri.host in setOf("jwgl2018.xatu.edu.cn", "self.xatu.edu.cn") && uri.port == 80)
     }.getOrDefault(false)
 }
 

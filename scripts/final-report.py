@@ -41,7 +41,8 @@ for variant, name in [('debug', 'app-debug.apk'), ('release', 'app-release-unsig
 offline_file = root / 'artifacts/qa/offline/offline-result.json'
 offline = json.loads(offline_file.read_text()) if offline_file.exists() else {}
 logs = {name: 'BUILD SUCCESSFUL' in (out / f'{name}.txt').read_text() if (out / f'{name}.txt').exists() else False for name in ['build', 'lint']}
-report = {'version': '0.4.0', 'generatedAt': datetime.now(timezone.utc).isoformat(), 'build': logs,
+version = re.search(r'versionName\s*=\s*"([^"]+)"', (root / 'app/build.gradle.kts').read_text())[1]
+report = {'version': version, 'generatedAt': datetime.now(timezone.utc).isoformat(), 'build': logs,
           'unit': unit, 'lint': lint_counts, 'qa': instrumentation('qa'), 'benchmark': instrumentation('benchmark'),
           'offline': offline, 'apks': apks,
           'scope': 'emulator and local builds; physical device, release signing and live school services not revalidated'}

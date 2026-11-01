@@ -117,6 +117,17 @@ class CampusTest {
         assertFalse(policy.mayLocate("checkin","https://ehall.xatu.edu.cn/","https://authserver.xatu.edu.cn/"))
         assertFalse(policy.mayLocate("checkin","https://ehall.xatu.edu.cn:8443/","https://ehall.xatu.edu.cn/"))
     }
+    @Test fun campusNetworkAllowsOnlyTheSchoolsLegacyHttpServices() {
+        val policy = cn.edu.xatu.helper.data.SchoolUrls
+        assertTrue(policy.trusted("http://self.xatu.edu.cn/Self/sso_login?ticket=fixture"))
+        assertTrue(policy.trusted("http://self.xatu.edu.cn:80/Self/dashboard"))
+        assertTrue(policy.trusted("https://self.xatu.edu.cn/Self/sso/packageChange"))
+        assertTrue(policy.trusted("http://jwgl2018.xatu.edu.cn/eams/"))
+        assertFalse(policy.trusted("http://self.xatu.edu.cn.evil.example/Self/"))
+        assertFalse(policy.trusted("http://evil.self.xatu.edu.cn/Self/"))
+        assertFalse(policy.trusted("http://self.xatu.edu.cn:8080/Self/"))
+        assertFalse(policy.trusted("http://authserver.xatu.edu.cn/authserver/login"))
+    }
     @Test fun historicDatesAndPastRemindersAreNotRescheduled() {
         val historic = table().copy(monday = "2025-09-01")
         assertTrue(ReminderPlanner.plan(historic, emptyList(), ReminderSettings(classes = true), now).isEmpty())

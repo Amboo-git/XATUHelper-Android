@@ -36,6 +36,8 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
         request = viewModelScope.launch {
             try {
                 repository.initialize()
+                // Production updates must not reopen a sample account saved by an older debug build.
+                if (!BuildConfig.DEMO_ENABLED && repository.store.account() == "__demo__") repository.logout()
                 val account = repository.store.account()
                 val (semester, kind) = repository.store.selection()
                 val table = repository.store.table(account, semester, kind)
@@ -71,11 +73,11 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
         }
     }
     private fun cancelAcademic() { academicJobs.values.forEach { it.cancel() }; academicJobs.clear() }
-    fun login(account: String, password: String, firstMonday: String) {
+    fun login(account: String, password: String) {
         if (account.isBlank() || password.isEmpty()) { mutable.update { it.copy(error = "请填写学号和密码") }; return }
         cancelAcademic()
         mutable.update { it.copy(webAccount = account.trim()) }
-        action { accept(repository.login(account.trim(), password, parseMonday(firstMonday))) }
+        action { accept(repository.login(account.trim(), password)) }
     }
     private fun parseMonday(text: String): LocalDate? = if (text.isBlank()) null else runCatching { LocalDate.parse(text) }.getOrElse { throw IllegalArgumentException("日期格式应为 yyyy-MM-dd，例如 2026-09-07") }
     fun openWeb(account: String) {
@@ -83,16 +85,16 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
         cancelAcademic()
         action { repository.beginWebLogin(); mutable.update { it.copy(webAccount = account.trim(), showWebLogin = true, error = null) } }
     }
-    fun finishWeb(firstMonday: String) {
+    fun finishWeb() {
         mutable.update { it.copy(showWebLogin = false) }
-        action { accept(repository.completeWebLogin(mutable.value.webAccount, parseMonday(firstMonday))) }
+        action { accept(repository.completeWebLogin(mutable.value.webAccount)) }
     }
     fun closeWeb() { mutable.update { it.copy(showWebLogin = false) } }
     fun webError(message: String) { mutable.update { it.copy(error = message) } }
     private suspend fun accept(table: Timetable) {
         val semesters = repository.store.semesters()
         val currentSemester = repository.store.currentSemester(table.account)
-        mutable.update { it.copy(allGrades = if (it.account == table.account) it.allGrades else false, academic = if (it.account == table.account) it.academic else emptyMap(), account = table.account, currentSemester = currentSemester, webAccount = table.account, table = table, semesters = semesters, selectedSemester = table.semester.id, kind = table.kind, needsLogin = false, demo = table.account == "__demo__", week = weekOf(LocalDate.parse(table.monday), schoolToday())) }
+        mutable.update { it.copy(allGrades = if (it.account == table.account) it.allGrades else false, academic = if (it.account == table.account) it.academic else emptyMap(), account = table.account, currentSemester = currentSemester, webAccount = table.account, table = table, semesters = semesters, selectedSemester = table.semester.id, kind = table.kind, needsLogin = false, demo = BuildConfig.DEMO_ENABLED && table.account == "__demo__", week = weekOf(LocalDate.parse(table.monday), schoolToday())) }
         warmExams()
         campus?.load()
         runCatching { syncSystems() }

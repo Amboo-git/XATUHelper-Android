@@ -22,6 +22,8 @@ class MilestoneTest {
     @Test fun loginValidationDemoNavigationTimetableAndRecreation() {
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         compose.waitUntil(15000) { compose.onAllNodesWithTag("demo").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("周次校准（可选）").assertDoesNotExist()
+        compose.onNodeWithText("第一周周一 · yyyy-MM-dd").assertDoesNotExist()
         screenshot("login-light.png")
         compose.onNodeWithTag("login").performScrollTo().performClick()
         compose.onNodeWithText("请填写学号和密码").assertIsDisplayed()
@@ -106,6 +108,11 @@ class MilestoneTest {
         compose.onNodeWithTag("diagnostics").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("复制诊断数据").performScrollTo().assertIsDisplayed()
         screenshot("diagnostics.png")
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("appVersion"))
+        compose.onNodeWithTag("appVersion").assertTextEquals("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})")
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("githubRepository"))
+        compose.onNodeWithTag("githubRepository").assertHasClickAction().assertIsDisplayed()
+        compose.onNodeWithText("Kelejun/XATUHelper-Android").assertIsDisplayed()
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("logout"))
         compose.onNodeWithTag("logout").assertIsDisplayed()
         screenshot("settings.png")
@@ -124,8 +131,20 @@ class MilestoneTest {
         compose.onNodeWithText("楼栋：请选择").performScrollTo().performClick()
         compose.onNodeWithText("9号楼").performClick()
         waitFor("房间：请选择")
-        compose.onNodeWithText("房间：请选择").performScrollTo().performClick()
-        compose.onNodeWithText("328").performClick()
+        compose.onNodeWithTag("roomSearch").performScrollTo().performClick().performTextInput("328")
+        fun imeVisible() = androidx.core.view.ViewCompat.getRootWindowInsets(compose.activity.window.decorView)
+            ?.getInsets(androidx.core.view.WindowInsetsCompat.Type.ime())?.bottom?.let {
+                it > 100 * compose.activity.resources.displayMetrics.density
+            } == true
+        compose.waitUntil(5000) { imeVisible() }
+        compose.onNodeWithTag("roomSearch").assertIsDisplayed()
+        compose.onNodeWithTag("electricity").performScrollToNode(hasText("保存并查询"))
+        compose.onNodeWithText("保存并查询").assertIsDisplayed()
+        screenshot("electricity-keyboard.png")
+        compose.onNodeWithTag("electricity").performScrollToNode(hasText("房间：请选择"))
+        compose.onNodeWithText("房间：请选择").performClick()
+        compose.onNode(hasText("328") and hasAnyAncestor(isPopup())).performClick()
+        compose.waitUntil(5000) { !imeVisible() }
         compose.onNodeWithText("保存并查询").performScrollTo().performClick()
         waitFor("¥ 68.50")
         compose.onNodeWithTag("electricBalance").assertTextEquals("¥ 68.50")

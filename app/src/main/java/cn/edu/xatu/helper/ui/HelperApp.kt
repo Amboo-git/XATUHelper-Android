@@ -43,21 +43,19 @@ import java.time.format.DateTimeFormatter
 @Composable fun HelperApp(model: HelperViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
     var relogin by rememberSaveable { mutableStateOf(false) }
-    var firstMonday by rememberSaveable { mutableStateOf("") }
-    LaunchedEffect(state.table?.fetchedAt) { if (state.table != null && !state.needsLogin) { relogin = false; firstMonday = "" } }
+    LaunchedEffect(state.table?.fetchedAt) { if (state.table != null && !state.needsLogin) relogin = false }
     when {
         state.starting -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        state.showWebLogin -> WebLogin(state.webAccount, model::closeWeb, { model.finishWeb(firstMonday) }, model::webError)
-        state.account.isEmpty() || state.table == null && state.selectedSemester.isEmpty() || relogin -> LoginScreen(state, firstMonday, { firstMonday = it }, model::login, model::openWeb, model::demo, if (state.table != null) ({ relogin = false }) else null)
+        state.showWebLogin -> WebLogin(state.webAccount, model::closeWeb, model::finishWeb, model::webError)
+        state.account.isEmpty() || state.table == null && state.selectedSemester.isEmpty() || relogin -> LoginScreen(state, model::login, model::openWeb, if (BuildConfig.DEMO_ENABLED) model::demo else null, if (state.table != null) ({ relogin = false }) else null)
         else -> MainShell(state, model, { relogin = true })
     }
 }
 
-@Composable private fun LoginScreen(state: UiState, firstMonday: String, onMonday: (String) -> Unit, onLogin: (String, String, String) -> Unit, onWeb: (String) -> Unit, onDemo: () -> Unit, onBack: (() -> Unit)?) {
+@Composable internal fun LoginScreen(state: UiState, onLogin: (String, String) -> Unit, onWeb: (String) -> Unit, onDemo: (() -> Unit)?, onBack: (() -> Unit)?) {
     var account by rememberSaveable { mutableStateOf(state.account.takeUnless { it == "__demo__" }.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    var calibration by rememberSaveable { mutableStateOf(false) }
     onBack?.let { BackHandler(onBack = it) }
     Surface(Modifier.fillMaxSize()) {
         Column(Modifier.safeDrawingPadding().imePadding().fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -75,14 +73,12 @@ import java.time.format.DateTimeFormatter
                 trailingIcon = { IconButton(onClick = { visible = !visible }) { Icon(if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (visible) "隐藏密码" else "显示密码") } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth().testTag("password"))
             state.error?.let { ErrorCard(it) }
-            Button(onClick = { onLogin(account, password, firstMonday) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("login")) {
+            Button(onClick = { onLogin(account, password) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("login")) {
                 if (state.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary) else Text("登录")
             }
             OutlinedButton(onClick = { password = ""; onWeb(account) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(48.dp)) { Icon(Icons.Default.Language, null); Spacer(Modifier.width(8.dp)); Text("使用网页登录") }
             Text("需要验证码或动态码时，可在学校网页完成认证。凭据仅加密保存在此设备，直接连接学校服务器。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = { calibration = !calibration }) { Text("周次校准（可选）") }
-            if (calibration) OutlinedTextField(firstMonday, onMonday, label = { Text("第一周周一 · yyyy-MM-dd") }, supportingText = { Text("仅在学校未返回开学日期时填写。") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-            if (BuildConfig.DEMO_ENABLED) TextButton(onClick = onDemo, enabled = !state.busy, modifier = Modifier.fillMaxWidth().testTag("demo")) { Text("体验校园助手 · 调试版") }
+            if (BuildConfig.DEMO_ENABLED) onDemo?.let { demo -> TextButton(onClick = demo, enabled = !state.busy, modifier = Modifier.fillMaxWidth().testTag("demo")) { Text("体验校园助手 · 调试版") } }
             onBack?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text("返回离线课表") } }
         }
     }

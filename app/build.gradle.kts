@@ -4,6 +4,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.kapt")
 }
+
+// Read HEAD for each build; never hard-code the previous commit into source files.
+val gitCommit = providers.exec {
+    workingDir(rootDir)
+    commandLine("git", "rev-parse", "--short=7", "HEAD")
+    isIgnoreExitValue = true
+}.standardOutput.asText.map { it.trim().ifEmpty { "unknown" } }.get()
+
 android {
     namespace = "cn.edu.xatu.helper"
     compileSdk = 36
@@ -11,8 +19,9 @@ android {
         applicationId = "cn.edu.xatu.helper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 7
+        versionName = "1.0.2"
+        buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -22,7 +31,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildTypes {
-        debug { buildConfigField("boolean", "DEMO_ENABLED", "true") }
+        debug { buildConfigField("boolean", "DEMO_ENABLED", "false") }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -40,6 +49,7 @@ android {
     buildTypes.create("qa") {
         initWith(buildTypes.getByName("debug"))
         applicationIdSuffix = ".qa"
+        buildConfigField("boolean", "DEMO_ENABLED", "true")
         matchingFallbacks += "debug"
     }
     testBuildType = "qa"

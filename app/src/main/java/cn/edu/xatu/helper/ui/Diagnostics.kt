@@ -5,7 +5,7 @@ import cn.edu.xatu.helper.model.*
 
 /** Deliberately constructed from counters: never copy raw HTML, errors, identity or session values. */
 fun diagnosticSummary(state: UiState): String = buildString {
-    appendLine("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.BUILD_TYPE})")
+    appendLine("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT}) · ${BuildConfig.BUILD_TYPE}")
     appendLine("课表缓存：${if (state.table == null) "无" else "有"}")
     appendLine("课表类型：${state.kind.title}；周次：${state.week}")
     appendLine("学期数：${state.semesters.size}；课程节次：${state.table?.courses?.size ?: 0}")

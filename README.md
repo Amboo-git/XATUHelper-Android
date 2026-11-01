@@ -4,7 +4,7 @@
 
 > iOS App 与 Widget 请前往 [XATUHelper](https://github.com/Kelejun/XATUHelper)。本仓库维护原生 Android 版，替代原 Skip 迁移版本。
 
-## 当前功能（0.4.0）
+## 当前功能（1.0.2）
 
 - MD3 登录、首页、课程表、校园导航，动态配色与深色模式。
 - 统一身份认证密码登录；需要验证码或动态码时使用内置学校网页。
@@ -48,13 +48,15 @@
 Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。
 Release APK：`app/build/outputs/apk/release/app-release-unsigned.apk`；开启 R8 和资源压缩，需要你自己的发布签名后才能分发。
 
-Debug 登录页提供明确标注的示例校园数据，便于无账号检查界面。示例数据不会访问学校。正式 Release 构建不提供示例入口。
+Debug 与 Release 交付包均无示例账号入口。示例数据仅用于独立 QA／Benchmark 自动化测试包，不作为交付安装包。旧调试版本已保存的示例账号在交付版本启动时清理，真实账号不受影响。
+
+设置页显示 `版本号 (Git 短 commit)`，并提供 [GitHub 仓库](https://github.com/Kelejun/XATUHelper-Android)入口。构建时自动从 Git HEAD 读取 commit；源码压缩包没有 Git 历史时显示 `unknown`。交付前先提交最终源码，再构建和签名，确保版本对应实际提交。`scripts/package-release.py` 会拒绝 commit 与 HEAD 不一致的安装包。
 
 ## 登录与离线使用
 
 填写学号、统一认证密码后点击「登录」。网页登录前同样需要填写学号，用于区分本地课表；请在网页中使用同一个学号，成功进入教务后点击「完成登录」。网页登录不保存你在网页输入的密码。
 
-周次优先使用本地校准日期、学期起始日期或已有缓存；当前学期缺少日期时从教务首页的官方教学周推算。取不到日期时会明确提示，可在登录页展开「周次校准」或课表页点日期校准按钮填写第一周周一。不会硬编码某个学期的开学日期。
+周次优先使用本地校准日期、学期起始日期或已有缓存；当前学期缺少日期时从教务首页的官方教学周推算。取不到日期时会明确提示，可在登录后通过课表页或设置页校准第一周日期。不会硬编码某个学期的开学日期。
 
 断网和登录失效时仍保留已有课表。首次选择没有缓存的历史学期或班级课表需要联网；缺少开学日期时需要校准。系统时间计算统一使用 Asia/Shanghai。
 
@@ -74,7 +76,7 @@ performance/          独立进程的优化构建 UIAutomator 检查
 
 网络、HTML 解析和存储在后台执行；Compose 只消费不可变状态。按周过滤后再合并节次，避免单双周课程互相污染。认证串行处理，自动恢复最多每分钟一次、每小时三次；浏览页面不会触发反复登录。
 
-教务系统目前使用 HTTP，只对 `jwgl2018.xatu.edu.cn` 放行明文流量；其余连接维持 HTTPS 校验。Debug／Benchmark 为本地集成测试额外允许 localhost，Release 不包含此例外。不会忽略 TLS 证书错误。
+教务系统及校园网自助平台包含 HTTP 地址，仅对 `jwgl2018.xatu.edu.cn` 和 `self.xatu.edu.cn` 放行明文流量；校园网自助平台的统一认证回跳与页面接口依赖此兼容规则。其余连接维持 HTTPS 校验。Debug／Benchmark 为本地集成测试额外允许 localhost，Release 不包含此例外。不会忽略 TLS 证书错误。
 
 ## 许可
 

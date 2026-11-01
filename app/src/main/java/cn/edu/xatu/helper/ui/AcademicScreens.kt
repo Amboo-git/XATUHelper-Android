@@ -224,6 +224,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
 @Composable fun SettingsScreen(state: UiState, onBack: () -> Unit, onCalibrate: () -> Unit, onRelogin: () -> Unit, onLogout: () -> Unit, onReminders: () -> Unit = {}, onWidgets: () -> Unit = {}, onWeekend: (Boolean) -> Unit = {}, onDiagnostics: (Boolean) -> Unit = {}, campus: CampusState = CampusState(), onAutoElectric: (Boolean) -> Unit = {}) {
     var confirmLogout by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     var copied by remember { mutableStateOf(false) }
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回校园") } }) }) { padding ->
         LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -256,8 +257,11 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                 }) { Text(if (copied) "已复制诊断数据" else "复制诊断数据") }
             }
             item { Text("关于", style = MaterialTheme.typography.titleMedium) }
-            item { Text("XATU Helper ${BuildConfig.VERSION_NAME}", fontWeight = FontWeight.Medium) }
+            item { Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", fontWeight = FontWeight.Medium, modifier = Modifier.testTag("appVersion")) }
             item { Text("西安工业大学校园助手 · 原生 Android", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { OutlinedCard(onClick = { uriHandler.openUri("https://github.com/Kelejun/XATUHelper-Android") }, modifier = Modifier.fillMaxWidth().testTag("githubRepository")) {
+                ListItem(headlineContent = { Text("GitHub 仓库") }, supportingContent = { Text("Kelejun/XATUHelper-Android") }, leadingContent = { Icon(Icons.Default.Code, null) }, trailingContent = { Icon(Icons.Default.OpenInNew, "打开 GitHub 仓库") })
+            } }
             item { Spacer(Modifier.height(16.dp)); OutlinedButton(onClick = { confirmLogout = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().testTag("logout"), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("退出登录") } }
         }
     }

@@ -22,6 +22,14 @@ import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class CampusPlatformTest {
+    @Test fun campusNetworkCleartextExceptionIsLimitedToExactHosts() {
+        val policy = android.security.NetworkSecurityPolicy.getInstance()
+        assertTrue(policy.isCleartextTrafficPermitted("self.xatu.edu.cn"))
+        assertTrue(policy.isCleartextTrafficPermitted("jwgl2018.xatu.edu.cn"))
+        assertFalse(policy.isCleartextTrafficPermitted("authserver.xatu.edu.cn"))
+        assertFalse(policy.isCleartextTrafficPermitted("evil.self.xatu.edu.cn"))
+        assertFalse(policy.isCleartextTrafficPermitted("self.xatu.edu.cn.evil.example"))
+    }
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val app get() = context.applicationContext as HelperApplication

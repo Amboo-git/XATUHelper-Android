@@ -23,6 +23,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import cn.edu.xatu.helper.data.SchoolUrls
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import kotlinx.coroutines.delay
 
 object CampusLinks {
     fun mayLocate(page: String, origin: String, topUrl: String): Boolean {
@@ -48,6 +49,14 @@ object CampusLinks {
     var web by remember { mutableStateOf<WebView?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
+    var navigation by remember { mutableIntStateOf(0) }
+    LaunchedEffect(loading, navigation) {
+        if (loading) {
+            delay(30_000)
+            loading = false
+            error = "网页加载超时，请检查网络后点击右上角重试，也可在浏览器中打开。"
+        }
+    }
     var pendingLocation by remember { mutableStateOf<Pair<String, GeolocationPermissions.Callback>?>(null) }
     var files by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> files?.onReceiveValue(uris.takeIf { it.isNotEmpty() }?.toTypedArray()); files = null }
@@ -60,11 +69,11 @@ object CampusLinks {
         web?.apply { stopLoading(); webChromeClient = null; webViewClient = WebViewClient(); removeAllViews(); destroy() }; web = null
     } }
     Scaffold(topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭网页") } }, actions = { IconButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(web?.url ?: url))) }.onFailure { error = "没有可打开网页的浏览器" } }) { Icon(Icons.Default.OpenInNew, "在浏览器中打开") }; IconButton(onClick = { error = null; web?.reload() }) { Icon(Icons.Default.Refresh, "重新加载网页") } }) }) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize()) {
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             if (page == "checkin") Text("定位仅用于当前学校签到网页，需你授权后提供。", Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
-            AndroidView(modifier = Modifier.fillMaxSize(), factory = { ctx -> WebView(ctx).apply {
+            AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { ctx -> WebView(ctx).apply {
                 web = this
                 settings.javaScriptEnabled = true; settings.domStorageEnabled = true
                 settings.allowFileAccess = false; settings.allowContentAccess = true
@@ -90,9 +99,10 @@ object CampusLinks {
                         if (request.hasGesture() && request.url.scheme in listOf("https", "http", "tel", "mailto", "alipays", "weixin")) {
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, request.url)) }.onFailure { error = "没有可打开此链接的应用" }
                         } else error = "已停止打开不受支持的跳转地址"
+                        loading = false
                         return true
                     }
-                    override fun onPageStarted(view: WebView, url: String, icon: android.graphics.Bitmap?) { loading = true; error = null }
+                    override fun onPageStarted(view: WebView, url: String, icon: android.graphics.Bitmap?) { navigation++; loading = true; error = null }
                     override fun onPageFinished(view: WebView, url: String) { loading = false; CookieManager.getInstance().flush() }
                     override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) { if (request.isForMainFrame) { loading = false; error = "网页加载失败，请检查网络后重试" } }
                     override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) { if (request.isForMainFrame) { loading = false; error = "学校服务返回 HTTP ${response.statusCode}" } }

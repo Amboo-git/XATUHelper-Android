@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -28,10 +30,12 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -48,7 +52,7 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable private fun CampusFrame(title: String, state: CampusState, onBack: () -> Unit, onRefresh: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回校园") } }, actions = { if (onRefresh != null) IconButton(onClick = onRefresh, enabled = !state.busy) { Icon(Icons.Default.Refresh, "刷新$title") } }) }) { padding ->
-        Column(Modifier.padding(padding).fillMaxSize()) {
+        Column(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize()) {
             if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
             content()
@@ -62,8 +66,10 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
     var confirmUnbind by remember { mutableStateOf(false) }
     var usageChart by rememberSaveable { mutableStateOf(true) }
     var roomSearch by rememberSaveable { mutableStateOf("") }
+    val focusManager = LocalFocusManager.current
+    LaunchedEffect(state.building?.id) { roomSearch = "" }
     CampusFrame("电费", state, onBack, if (state.dorm != null) controller::refreshElectricity else null) {
-        LazyColumn(state = listState, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.testTag("electricity")) {
+        LazyColumn(state = listState, contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxSize().testTag("electricity")) {
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = if (state.electric?.balance?.toBigDecimalOrNull()?.let { it < 10.toBigDecimal() } == true) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -82,9 +88,10 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
                 item { OptionPicker("电费项目", state.projects, state.project, state.busy, controller::project) }
                 item { OptionPicker("校区", state.areas, state.area, state.busy || state.project == null, controller::area) }
                 item { OptionPicker("楼栋", state.buildings, state.building, state.busy || state.area == null, controller::building) }
-                if (state.building != null) item { OutlinedTextField(roomSearch, { roomSearch = it }, label = { Text("筛选房间") }, supportingText = { Text("输入房间号缩小选项，最多显示 100 项") }, singleLine = true, modifier = Modifier.fillMaxWidth()) }
+                if (state.building != null) item { OutlinedTextField(roomSearch, { roomSearch = it }, label = { Text("筛选房间") }, supportingText = { Text("输入房间号缩小选项，最多显示 100 项") }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }), modifier = Modifier.fillMaxWidth().testTag("roomSearch")) }
                 item { OptionPicker("房间", state.rooms.filter { roomSearch.isBlank() || roomSearch in it.name }, state.room, state.busy || state.building == null, controller::room) }
-                item { Row { Button(onClick = controller::bindDorm, enabled = !state.busy && state.room != null) { Text("保存并查询") }; TextButton(onClick = controller::closeSelector, enabled = !state.busy) { Text("取消") } } }
+                item { Row { Button(onClick = { focusManager.clearFocus(); controller.bindDorm() }, enabled = !state.busy && state.room != null) { Text("保存并查询") }; TextButton(onClick = { focusManager.clearFocus(); controller.closeSelector() }, enabled = !state.busy) { Text("取消") } } }
             }
             if (state.dorm != null) {
                 item { Row(verticalAlignment = Alignment.CenterVertically) { Text("每日自动更新余额", Modifier.weight(1f)); Switch(state.autoElectric, controller::autoElectric, enabled = !state.busy) } }
@@ -119,8 +126,9 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
 }
 @Composable private fun OptionPicker(title: String, options: List<CampusOption>, selected: CampusOption?, disabled: Boolean, onPick: (CampusOption) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
+    val focusManager = LocalFocusManager.current
     Box {
-        OutlinedButton(onClick = { expanded = true }, enabled = !disabled && options.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("$title：${selected?.name ?: if (options.isEmpty()) "暂无选项" else "请选择"}"); Icon(Icons.Default.ArrowDropDown, null) }
+        OutlinedButton(onClick = { focusManager.clearFocus(); expanded = true }, enabled = !disabled && options.isNotEmpty(), modifier = Modifier.fillMaxWidth()) { Text("$title：${selected?.name ?: if (options.isEmpty()) "暂无选项" else "请选择"}"); Icon(Icons.Default.ArrowDropDown, null) }
         DropdownMenu(expanded, { expanded = false }) { options.take(100).forEach { option -> DropdownMenuItem(text = { Text(option.name) }, onClick = { expanded = false; onPick(option) }) } }
     }
 }
