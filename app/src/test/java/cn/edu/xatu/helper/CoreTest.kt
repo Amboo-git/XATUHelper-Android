@@ -84,7 +84,7 @@ class CoreTest {
         assertEquals("10:20–12:00", Periods.range(CourseBlock("a", "", "", "教2-101", 1, 3, 4, listOf(1))))
         assertEquals("10:10/10:20", Periods.gridStartLabel(3))
         assertEquals("10:20", Periods.starts[2])
-        assertEquals("09:10", Periods.gridStartLabel(2))
+        assertEquals("09:15", Periods.gridStartLabel(2))
     }
     @Test fun sanitizedOriginalEamsScriptParses() {
         val html = javaClass.getResource("/eams-table.html")!!.readText()

@@ -45,7 +45,7 @@ fun coursesOn(table: Timetable?, date: LocalDate): List<CourseBlock> {
 }
 
 object Periods {
-    val starts = listOf("08:20", "09:10", "10:20", "11:10", "14:00", "14:50", "16:00", "16:50", "18:10", "19:05", "20:00", "20:55")
+    val starts = listOf("08:20", "09:15", "10:20", "11:15", "14:00", "14:55", "16:00", "16:55", "18:10", "19:05", "20:00", "20:55")
     val ends = listOf("09:05", "10:00", "11:05", "12:00", "14:45", "15:40", "16:45", "17:40", "18:55", "19:50", "20:45", "21:40")
     // Display-only hint: actual ranges and reminders retain the building-specific schedule.
     fun gridStartLabel(period: Int): String = if (period == 3) "10:10/10:20" else starts.getOrElse(period - 1) { "" }

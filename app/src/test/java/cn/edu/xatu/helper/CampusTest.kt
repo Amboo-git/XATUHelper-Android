@@ -24,6 +24,23 @@ class CampusTest {
         assertTrue(special.body.startsWith("10:10–11:40"))
         assertTrue(ordinary.body.startsWith("10:20–12:00"))
     }
+    @Test fun correctedPeriodsUseFortyFiveMinutesAndScheduleRemindersAtActualStarts() {
+        val now = ZonedDateTime.of(2026, 11, 2, 8, 0, 0, 0, SchoolZone)
+        val ranges = mapOf(2 to "09:15–10:00", 4 to "11:15–12:00", 6 to "14:55–15:40", 8 to "16:55–17:40")
+        val courses = ranges.keys.map { Course("c$it", "课程$it", "", "教1-101", 1, it, listOf(1)) }
+        val table = Timetable("fixture", Semester("s", "学期"), TableKind.STUDENT, courses, 12, "2026-11-02", 0)
+        val reminders = ReminderPlanner.plan(table, emptyList(), ReminderSettings(classes = true, classLead = 30), now)
+        assertEquals(4, reminders.size)
+        ranges.forEach { (period, range) ->
+            assertEquals(range.substringBefore('–'), Periods.gridStartLabel(period))
+            val reminder = reminders.single { it.title == "下一节课：课程$period" }
+            assertTrue(reminder.body.startsWith(range))
+            val start = LocalTime.parse(range.substringBefore('–'))
+            val end = LocalTime.parse(range.substringAfter('–'))
+            assertEquals(45L, Duration.between(start, end).toMinutes())
+            assertEquals(now.toLocalDate().atTime(start).atZone(SchoolZone).minusMinutes(30).toInstant().toEpochMilli(), reminder.at)
+        }
+    }
     private class Jar : CookieJar {
         val values = mutableListOf<Cookie>()
         override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) { cookies.forEach { incoming -> values.removeAll { it.name == incoming.name && it.domain == incoming.domain && it.path == incoming.path }; if (incoming.expiresAt > System.currentTimeMillis()) values.add(incoming) } }
