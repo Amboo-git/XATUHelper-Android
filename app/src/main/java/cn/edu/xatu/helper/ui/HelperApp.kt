@@ -368,9 +368,12 @@ import java.time.format.DateTimeFormatter
                     modifier = Modifier.offset(x = gutter + dayWidth * (block.day - 1) + width * placement.lane + 2.dp, y = header + row * (block.start - 1) + 2.dp)
                         .width(width - 4.dp).height(row * (block.end - block.start + 1) - 4.dp)
                         .semantics { contentDescription = "${block.name}，${block.room}，${block.periodText}" }) {
-                    Column(Modifier.padding(horizontal = 4.dp, vertical = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                        Text(block.name, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, maxLines = 5, overflow = TextOverflow.Ellipsis)
-                        Text(block.room.substringBefore('(').substringBefore('（'), fontSize = 9.sp, lineHeight = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Box {
+                        Box(Modifier.fillMaxHeight().width(3.dp).background(color.accent))
+                        Column(Modifier.padding(start = 7.dp, end = 4.dp, top = 7.dp, bottom = 7.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                            Text(block.name, fontSize = 11.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium, maxLines = 5, overflow = TextOverflow.Ellipsis)
+                            Text(block.room.substringBefore('(').substringBefore('（'), fontSize = 9.sp, lineHeight = 12.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }

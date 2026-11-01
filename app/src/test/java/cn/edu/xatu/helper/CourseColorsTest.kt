@@ -39,6 +39,13 @@ class CourseColorsTest {
             val b = colors.content.luminance()
             val contrast = (maxOf(a, b) + .05f) / (minOf(a, b) + .05f)
             assertTrue("Text contrast was $contrast", contrast >= 4.5f)
+            val accent = colors.accent.luminance()
+            val stripeContrast = (maxOf(a, accent) + .05f) / (minOf(a, accent) + .05f)
+            assertTrue("Accent contrast was $stripeContrast", stripeContrast >= 3f)
+        }
+        listOf(CoursePalette.light, CoursePalette.dark).forEach { palette ->
+            val tones = palette.map { it.background.luminance() }
+            assertTrue("HCT containers should share the same tonal level", tones.max() - tones.min() < .01f)
         }
         assertTrue(CoursePalette.indices((1..40).map { "course$it" }).values.all { it in CoursePalette.light.indices })
     }
