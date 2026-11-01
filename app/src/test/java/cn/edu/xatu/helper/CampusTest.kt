@@ -9,6 +9,21 @@ import org.junit.Test
 import java.time.*
 
 class CampusTest {
+    @Test fun buildingThreeReminderUsesTenTenWhileOtherBuildingsUseTenTwenty() {
+        val now = ZonedDateTime.of(2026, 11, 2, 8, 0, 0, 0, SchoolZone)
+        val courses = listOf("教3-101", "教1-101").flatMapIndexed { index, room ->
+            (3..4).map { period -> Course("c$index", "课程$index", "", room, 1, period, listOf(1)) }
+        }
+        val table = Timetable("fixture", Semester("s", "学期"), TableKind.STUDENT, courses, 12, "2026-11-02", 0)
+        val reminders = ReminderPlanner.plan(table, emptyList(), ReminderSettings(classes = true, classLead = 30), now)
+        assertEquals(2, reminders.size)
+        val special = reminders.single { "教3-101" in it.body }
+        val ordinary = reminders.single { "教1-101" in it.body }
+        assertEquals(now.withHour(9).withMinute(40).toInstant().toEpochMilli(), special.at)
+        assertEquals(now.withHour(9).withMinute(50).toInstant().toEpochMilli(), ordinary.at)
+        assertTrue(special.body.startsWith("10:10–11:40"))
+        assertTrue(ordinary.body.startsWith("10:20–12:00"))
+    }
     private class Jar : CookieJar {
         val values = mutableListOf<Cookie>()
         override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) { cookies.forEach { incoming -> values.removeAll { it.name == incoming.name && it.domain == incoming.domain && it.path == incoming.path }; if (incoming.expiresAt > System.currentTimeMillis()) values.add(incoming) } }

@@ -32,6 +32,7 @@ class MilestoneTest {
         screenshot("home-light.png")
         compose.onNodeWithTag("tab1").performClick()
         compose.onNodeWithTag("week").assertTextEquals("第 8 周")
+        compose.onNodeWithTag("periodStart3").assertTextEquals("10:10/\n10:20").assertContentDescriptionEquals("10:10/10:20")
         compose.onNodeWithContentDescription("校准周次").performClick()
         compose.onNodeWithTag("actualWeek").assertIsDisplayed()
         compose.onNodeWithText("按这个周次校正").performClick()

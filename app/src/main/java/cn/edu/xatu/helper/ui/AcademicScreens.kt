@@ -38,7 +38,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
         })
     }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            if (reading.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            LoadingProgress(reading.loading)
             if (state.demo) Text("示例数据 · 未连接学校账号", Modifier.padding(horizontal = 20.dp), style = MaterialTheme.typography.labelMedium)
             if (kind != AcademicKind.PLAN) {
                 Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -141,7 +141,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                     Text(listOf(grade.term, grade.code, grade.credit.takeIf { it.isNotBlank() }?.let { "$it 学分" }.orEmpty()).filter(String::isNotBlank).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
                     if (grade.parts.isNotEmpty()) {
                         Text(if (expanded) "收起分项成绩" else "查看分项成绩", style = MaterialTheme.typography.labelLarge)
-                        if (expanded) grade.parts.forEach { part -> Text("${part.name}：${part.score}") }
+                        Reveal(expanded) { grade.parts.forEach { part -> Text("${part.name}：${part.score}") } }
                     }
                 }
             }
@@ -200,10 +200,10 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             Text(if (expanded) "收起模块" else "展开模块", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
         }
     }
-    if (expanded) Column(Modifier.padding(start = 12.dp, top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Reveal(expanded) { Column(Modifier.padding(start = 12.dp, top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         section.courses.forEach { course -> PlanCourseCard(course, byCode[course.code] ?: byName[course.name]) }
         section.children.forEach { child -> PlanModule(child, byCode, byName) }
-    }
+    } }
 }
 @Composable private fun PlanCourseCard(course: PlanCourse, info: CourseInfo?) {
     OutlinedCard(Modifier.fillMaxWidth()) {

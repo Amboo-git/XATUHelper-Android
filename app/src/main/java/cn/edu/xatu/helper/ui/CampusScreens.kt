@@ -10,6 +10,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
@@ -53,8 +54,8 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
 @Composable private fun CampusFrame(title: String, state: CampusState, onBack: () -> Unit, onRefresh: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Scaffold(topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回校园") } }, actions = { if (onRefresh != null) IconButton(onClick = onRefresh, enabled = !state.busy) { Icon(Icons.Default.Refresh, "刷新$title") } }) }) { padding ->
         Column(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize()) {
-            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
-            state.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
+            LoadingProgress(state.busy)
+            Reveal(state.error != null) { state.error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) } }
             content()
         }
     }
@@ -74,7 +75,9 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
                 Card(colors = CardDefaults.cardColors(containerColor = if (state.electric?.balance?.toBigDecimalOrNull()?.let { it < 10.toBigDecimal() } == true) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text("宿舍余额", style = MaterialTheme.typography.titleMedium)
-                        Text(state.electric?.let { "¥ ${it.balance}" } ?: "—", style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag("electricBalance"))
+                        AnimatedContent(state.electric?.let { "¥ ${it.balance}" } ?: "—", label = "electricBalance") { balance ->
+                            Text(balance, style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag("electricBalance"))
+                        }
                         Text(state.dorm?.label ?: "还未选择宿舍")
                         state.electric?.let { Text("更新于 ${moneyTime(it.checkedAt)}", style = MaterialTheme.typography.bodySmall) }
                     }

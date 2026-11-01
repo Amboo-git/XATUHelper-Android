@@ -1,6 +1,8 @@
 package cn.edu.xatu.helper.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -44,11 +47,18 @@ import java.time.format.DateTimeFormatter
     val state by model.state.collectAsStateWithLifecycle()
     var relogin by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.table?.fetchedAt) { if (state.table != null && !state.needsLogin) relogin = false }
-    when {
-        state.starting -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        state.showWebLogin -> WebLogin(state.webAccount, model::closeWeb, model::finishWeb, model::webError)
-        state.account.isEmpty() || state.table == null && state.selectedSemester.isEmpty() || relogin -> LoginScreen(state, model::login, model::openWeb, if (BuildConfig.DEMO_ENABLED) model::demo else null, if (state.table != null) ({ relogin = false }) else null)
+    val screen = when {
+        state.starting -> "starting"
+        state.showWebLogin -> "webLogin"
+        state.account.isEmpty() || state.table == null && state.selectedSemester.isEmpty() || relogin -> "login"
+        else -> "main"
+    }
+    ScreenTransition(screen) { destination -> when (destination) {
+        "starting" -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        "webLogin" -> WebLogin(state.webAccount, model::closeWeb, model::finishWeb, model::webError)
+        "login" -> LoginScreen(state, model::login, model::openWeb, if (BuildConfig.DEMO_ENABLED) model::demo else null, if (state.table != null) ({ relogin = false }) else null)
         else -> MainShell(state, model, { relogin = true })
+    }
     }
 }
 
@@ -72,7 +82,7 @@ import java.time.format.DateTimeFormatter
                 visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = { IconButton(onClick = { visible = !visible }) { Icon(if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility, if (visible) "隐藏密码" else "显示密码") } },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password), modifier = Modifier.fillMaxWidth().testTag("password"))
-            state.error?.let { ErrorCard(it) }
+            Reveal(state.error != null) { state.error?.let { ErrorCard(it) } }
             Button(onClick = { onLogin(account, password) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("login")) {
                 if (state.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary) else Text("登录")
             }
@@ -101,14 +111,17 @@ import java.time.format.DateTimeFormatter
     val titles = listOf("首页", "课程表", "校园")
     val icons = listOf(Icons.Default.Home, Icons.Default.CalendarMonth, Icons.Default.AccountBalance)
     BackHandler(enabled = page != null || tab != 0) { if (page != null) page = parentPage(page) else tab = 0 }
-    when (page) {
+    var previousPage by remember { mutableStateOf(page) }
+    val direction = remember(page) { if (page == null || parentPage(previousPage) == page) -1 else 1 }
+    SideEffect { previousPage = page }
+    ScreenTransition(page, direction = direction) { destination -> when (destination) {
         "settings" -> SettingsScreen(state, { page = null }, { showCalibration = true }, onRelogin, model::logout, { page = "notifications" }, { page = "widgets" }, model::showWeekend, model::showDiagnostics, campusState, { model.campus?.autoElectric(it) })
         "electricity" -> model.campus?.let { ElectricityScreen(it, { page = null }, { page = "charge" }) }
         "calendar" -> model.campus?.let { CalendarScreen(it, { page = null }) }
         "notifications" -> model.campus?.let { ReminderScreen(it, { page = "settings" }) }
         "widgets" -> WidgetSettings({ page = "settings" }, campusState)
-        in CampusLinks.pages.keys -> CampusWeb(page!!, { model.browserClosed(); page = parentPage(page) })
-        "exams", "grades", "plan" -> AcademicScreen(when (page) { "exams" -> AcademicKind.EXAMS; "grades" -> AcademicKind.GRADES; else -> AcademicKind.PLAN }, state, model, { page = null }, onRelogin, { page = if (page == "plan") "planWeb" else "eams" })
+        in CampusLinks.pages.keys -> CampusWeb(destination!!, { model.browserClosed(); page = parentPage(destination) })
+        "exams", "grades", "plan" -> AcademicScreen(when (destination) { "exams" -> AcademicKind.EXAMS; "grades" -> AcademicKind.GRADES; else -> AcademicKind.PLAN }, state, model, { page = null }, onRelogin, { page = if (destination == "plan") "planWeb" else "eams" })
         else -> Scaffold(topBar = {
         TopAppBar(title = { Text(titles[tab], fontWeight = FontWeight.SemiBold) }, actions = {
             if (tab == 1) IconButton(onClick = { showCalibration = true }, enabled = !state.busy) { Icon(Icons.Default.EditCalendar, "校准周次") }
@@ -119,9 +132,9 @@ import java.time.format.DateTimeFormatter
         NavigationBar { titles.forEachIndexed { index, title -> NavigationBarItem(selected = tab == index, onClick = { tab = index }, icon = { Icon(icons[index], null) }, label = { Text(title) }, modifier = Modifier.testTag("tab$index")) } }
     }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            if (state.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
+            LoadingProgress(state.busy)
             if (state.demo) Text("示例数据 · 未连接学校账号", Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 16.dp, vertical = 6.dp), style = MaterialTheme.typography.labelMedium)
-            state.error?.let { error ->
+            Reveal(state.error != null) { state.error?.let { error ->
                 ElevatedCard(Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
                     Column(Modifier.padding(12.dp)) {
                         Text(error, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -132,14 +145,19 @@ import java.time.format.DateTimeFormatter
                         }
                     }
                 }
-            }
-            when (tab) {
+            } }
+            AnimatedContent(targetState = tab, modifier = Modifier.weight(1f).fillMaxWidth(), transitionSpec = {
+                val sign = if (targetState > initialState) 1 else -1
+                (fadeIn(tween(AppMotion.EnterMillis)) + slideInHorizontally(tween(AppMotion.EnterMillis, easing = AppMotion.Easing)) { sign * it / 12 })
+                    .togetherWith(fadeOut(tween(AppMotion.ExitMillis)))
+                    .using(SizeTransform(clip = false))
+            }, label = "mainTabs") { activeTab -> when (activeTab) {
                 0 -> HomeScreen(state, { tab = 1 }, { course = it }, { model.campus?.dismissError(); page = it }, campusState)
                 1 -> TimetableScreen(state, model, { course = it })
                 else -> CampusScreen { model.campus?.dismissError(); page = it }
-            }
+            } }
         }
-    }
+    } }
     }
     val reminderPermission = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()) { _ -> model.resume() }
@@ -284,7 +302,7 @@ import java.time.format.DateTimeFormatter
     val showWeekend = state.showWeekend
     var weeksOpen by remember { mutableStateOf(false) }
     val pager = rememberPagerState(initialPage = state.week - 1, pageCount = { 30 })
-    LaunchedEffect(state.week) { if (!pager.isScrollInProgress && pager.currentPage != state.week - 1) pager.scrollToPage(state.week - 1) }
+    LaunchedEffect(state.week) { if (pager.currentPage != state.week - 1) pager.animateScrollToPage(state.week - 1, animationSpec = tween(AppMotion.EnterMillis, easing = AppMotion.Easing)) }
     LaunchedEffect(pager) { snapshotFlow { pager.settledPage }.distinctUntilChanged().collect { model.changeWeek(it + 1) } }
     Column(Modifier.fillMaxSize()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -324,7 +342,9 @@ import java.time.format.DateTimeFormatter
             val courseColors = remember(table.courses) { CoursePalette.indices(table.courses.map { it.key }) }
             HorizontalPager(state = pager, modifier = Modifier.weight(1f).testTag("weekPager"), key = { it }) { page ->
                 val blocks = remember(table.courses, page) { blocksFor(table.courses, page + 1) }
-                WeekGrid(blocks, courseColors, table.unitCount, LocalDate.parse(table.monday).plusWeeks(page.toLong()), showWeekend, onCourse)
+                Box(Modifier.fillMaxSize().then(if (page == pager.currentPage) Modifier else Modifier.clearAndSetSemantics { })) {
+                    WeekGrid(blocks, courseColors, table.unitCount, LocalDate.parse(table.monday).plusWeeks(page.toLong()), showWeekend, onCourse)
+                }
             }
             CacheLabel(table, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         }
@@ -356,9 +376,13 @@ import java.time.format.DateTimeFormatter
                     Text("${date.dayOfMonth}", style = MaterialTheme.typography.labelLarge, fontWeight = if (today) FontWeight.Bold else FontWeight.Normal)
                 }
             }
-            repeat(units) { index -> Column(Modifier.offset(y = header + row * index).width(gutter).height(row), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            repeat(units) { index ->
+                val startLabel = Periods.gridStartLabel(index + 1)
+                Column(Modifier.offset(y = header + row * index).width(gutter).height(row), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                 Text("${index + 1}", fontSize = 12.sp)
-                Text(Periods.starts.getOrElse(index) { "" }, fontSize = 7.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(startLabel.replace("/", "/\n"), fontSize = 7.sp, lineHeight = 9.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().testTag("periodStart${index + 1}").semantics { contentDescription = startLabel })
             } }
             placements.filter { it.block.day <= days }.forEach { placement ->
                 val block = placement.block

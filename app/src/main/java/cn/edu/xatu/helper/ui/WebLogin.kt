@@ -29,7 +29,7 @@ import cn.edu.xatu.helper.data.SchoolUrls
     }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
             Text("请使用学号 $account 登录；登录成功后点击右上角完成。", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
-            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            LoadingProgress(loading)
             error?.let { message ->
                 Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
                 TextButton(onClick = { error = null; web?.loadUrl(SchoolUrls.login) }) { Text("重新加载") }
