@@ -76,34 +76,6 @@ performance/          独立进程的优化构建 UIAutomator 检查
 
 教务系统目前使用 HTTP，只对 `jwgl2018.xatu.edu.cn` 放行明文流量；其余连接维持 HTTPS 校验。Debug／Benchmark 为本地集成测试额外允许 localhost，Release 不包含此例外。不会忽略 TLS 证书错误。
 
-## 验证
-
-见 [真机补测](VALIDATION-PHYSICAL.md)、[最终阶段检查](VALIDATION-FINAL.md) 和 [iOS 逐项对齐表](PARITY-IOS.md)；[阶段 7–10 验证记录](VALIDATION-STAGES7-10.md)；[第二阶段记录](VALIDATION-STAGE2.md)；[首阶段历史记录](VALIDATION.md) 保留原始测量条件。真实账号和真机验收与模拟数据、模拟器测试分开记录。
-
-```sh
-python3 scripts/offline-smoke.py --adb /你的/adb
-```
-
-离线脚本默认仅操作模拟器 .qa 包的示例账号，检查后恢复网络、明暗模式与字体设置。
-
-```sh
-# 构建并运行独立 .qa 包测试；不清空已登录的主应用
-ADB=/你的/adb scripts/device-tests.sh qa
-
-# 优化构建：非 debuggable、R8、资源压缩、独立 .benchmark 包名
-ADB=/你的/adb scripts/device-tests.sh benchmark
-```
-
-真机 QA 使用显式设备序列号，独立安装并重置 `.qa` 包，不清除主应用，也不切换手机网络：
-
-```sh
-JAVA_HOME=/你的/JDK21 ADB=/你的/adb scripts/physical-tests.sh 设备序列号
-```
-
-这条命令包含示例数据测试，不等同于真实教务账号验收。手机需先开启 USB 调试并允许此电脑，界面测试开始前保持解锁；日志和截图单独保存到 `artifacts/qa/physical/`。模拟器脚本在同时连接手机时也会显式选中唯一模拟器。
-
-Benchmark 使用本机 debug key 签名，仅供测量；其示例入口不会出现在正式 Release 中。Debug 短采样来自 Window；Benchmark 由独立 UIAutomator 进程注入实际触摸事件并保存 gfxinfo。模拟器软件渲染会影响结果，不等同于真机帧率。
-
 ## 许可
 
 MIT。课表协议与解析规则参考原 XATUHelper；保留原作者版权声明，见 [LICENSE](LICENSE)。
