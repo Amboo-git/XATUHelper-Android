@@ -16,12 +16,13 @@ class MainActivity : ComponentActivity() {
         helperModel.openDestination(intent.getStringExtra("open_page"))
         intent.removeExtra("open_page")
     }
+    override fun onStart() { super.onStart(); if (::helperModel.isInitialized) helperModel.checkUpdates() }
     override fun onResume() { super.onResume(); if (::helperModel.isInitialized) helperModel.resume() }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val model = ViewModelProvider(this, object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = HelperViewModel((application as HelperApplication).repository, (application as HelperApplication).campusRepository) { cn.edu.xatu.helper.platform.SystemCoordinator.synchronize(application) } as T
+            @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = HelperViewModel((application as HelperApplication).repository, (application as HelperApplication).campusRepository, updates = (application as HelperApplication).updates) { cn.edu.xatu.helper.platform.SystemCoordinator.synchronize(application) } as T
         })[HelperViewModel::class.java]
         helperModel = model
         model.openDestination(intent.getStringExtra("open_page")); intent.removeExtra("open_page")

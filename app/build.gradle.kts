@@ -19,8 +19,8 @@ android {
         applicationId = "cn.edu.xatu.helper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
-        versionName = "1.0.5"
+        versionCode = 11
+        versionName = "1.1.0"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -89,5 +89,6 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+    add("qaImplementation", "androidx.compose.ui:ui-test-manifest")
 }
 kapt { arguments { arg("room.schemaLocation", "$projectDir/schemas") } }

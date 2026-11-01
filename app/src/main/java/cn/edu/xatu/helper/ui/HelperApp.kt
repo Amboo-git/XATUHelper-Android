@@ -45,6 +45,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable fun HelperApp(model: HelperViewModel) {
     val state by model.state.collectAsStateWithLifecycle()
+    val update by model.updateState.collectAsStateWithLifecycle()
     var relogin by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.table?.fetchedAt) { if (state.table != null && !state.needsLogin) relogin = false }
     val screen = when {
@@ -60,6 +61,32 @@ import java.time.format.DateTimeFormatter
         else -> MainShell(state, model, { relogin = true })
     }
     }
+    UpdateNotification(update, model::dismissUpdate, model::updateLinkFailed)
+}
+
+@Composable internal fun UpdateNotification(update: UpdateUi, onDismiss: () -> Unit, onLinkFailed: () -> Unit) {
+    val release = update.offer ?: return
+    var confirm by remember(release.version) { mutableStateOf(false) }
+    var linkError by remember(release.version) { mutableStateOf(false) }
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    if (!confirm) Popup(alignment = Alignment.TopCenter) {
+        Snackbar(modifier = Modifier.safeDrawingPadding().padding(16.dp),
+            action = { TextButton(onClick = { confirm = true }) { Text("查看更新") } },
+            dismissAction = { TextButton(onClick = onDismiss) { Text("稍后") } }) {
+            Text("发现新版本 ${release.version}")
+        }
+    }
+    if (confirm) AlertDialog(onDismissRequest = onDismiss,
+        title = { Text("更新至 ${release.version}") },
+        text = { Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("确认后将在浏览器中打开 GitHub Release 页面，由你下载并安装新版本。")
+            if (release.notes.isNotBlank()) Text(release.notes)
+            if (linkError) Text("没有可打开 GitHub 的浏览器，请安装浏览器后重试。", color = MaterialTheme.colorScheme.error)
+        } },
+        confirmButton = { TextButton(onClick = {
+            runCatching { uriHandler.openUri(release.url) }.onSuccess { onDismiss() }.onFailure { linkError = true; onLinkFailed() }
+        }) { Text("前往 GitHub 下载") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("稍后") } })
 }
 
 @Composable internal fun LoginScreen(state: UiState, onLogin: (String, String) -> Unit, onWeb: (String) -> Unit, onDemo: (() -> Unit)?, onBack: (() -> Unit)?) {
@@ -107,6 +134,7 @@ import java.time.format.DateTimeFormatter
             model.consumeDestination()
         }
     }
+    val update by model.updateState.collectAsStateWithLifecycle()
     val campusState = model.campus?.state?.collectAsStateWithLifecycle()?.value ?: CampusState()
     val titles = listOf("首页", "课程表", "校园")
     val icons = listOf(Icons.Default.Home, Icons.Default.CalendarMonth, Icons.Default.AccountBalance)
@@ -115,7 +143,7 @@ import java.time.format.DateTimeFormatter
     val direction = remember(page) { if (page == null || parentPage(previousPage) == page) -1 else 1 }
     SideEffect { previousPage = page }
     ScreenTransition(page, direction = direction) { destination -> when (destination) {
-        "settings" -> SettingsScreen(state, { page = null }, { showCalibration = true }, onRelogin, model::logout, { page = "notifications" }, { page = "widgets" }, model::showWeekend, model::showDiagnostics, campusState, { model.campus?.autoElectric(it) })
+        "settings" -> SettingsScreen(state, { page = null }, { showCalibration = true }, onRelogin, model::logout, { page = "notifications" }, { page = "widgets" }, model::showWeekend, model::showDiagnostics, campusState, { model.campus?.autoElectric(it) }, update, { model.checkUpdates(manual = true) })
         "electricity" -> model.campus?.let { ElectricityScreen(it, { page = null }, { page = "charge" }) }
         "calendar" -> model.campus?.let { CalendarScreen(it, { page = null }) }
         "notifications" -> model.campus?.let { ReminderScreen(it, { page = "settings" }) }

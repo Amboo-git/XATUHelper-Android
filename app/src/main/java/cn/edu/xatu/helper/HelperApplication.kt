@@ -11,6 +11,7 @@ class HelperApplication : Application() {
         private set
     lateinit var repository: TimetableRepository
         private set
+    val updates by lazy { AppUpdateRepository(UpdatePreferences(this)) }
     override fun onCreate() {
         super.onCreate()
         val vault = SecretVault(this)

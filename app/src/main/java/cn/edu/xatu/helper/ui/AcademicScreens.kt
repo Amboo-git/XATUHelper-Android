@@ -221,7 +221,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun SettingsScreen(state: UiState, onBack: () -> Unit, onCalibrate: () -> Unit, onRelogin: () -> Unit, onLogout: () -> Unit, onReminders: () -> Unit = {}, onWidgets: () -> Unit = {}, onWeekend: (Boolean) -> Unit = {}, onDiagnostics: (Boolean) -> Unit = {}, campus: CampusState = CampusState(), onAutoElectric: (Boolean) -> Unit = {}) {
+@Composable fun SettingsScreen(state: UiState, onBack: () -> Unit, onCalibrate: () -> Unit, onRelogin: () -> Unit, onLogout: () -> Unit, onReminders: () -> Unit = {}, onWidgets: () -> Unit = {}, onWeekend: (Boolean) -> Unit = {}, onDiagnostics: (Boolean) -> Unit = {}, campus: CampusState = CampusState(), onAutoElectric: (Boolean) -> Unit = {}, update: UpdateUi = UpdateUi(), onCheckUpdates: () -> Unit = {}) {
     var confirmLogout by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
@@ -259,6 +259,16 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             item { Text("关于", style = MaterialTheme.typography.titleMedium) }
             item { Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", fontWeight = FontWeight.Medium, modifier = Modifier.testTag("appVersion")) }
             item { Text("西安工业大学校园助手 · 原生 Android", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = onCheckUpdates, enabled = !update.checking, modifier = Modifier.fillMaxWidth().testTag("checkUpdates")) {
+                    if (update.checking) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)) }
+                    Text(if (update.checking) "正在检查更新…" else "检查更新")
+                }
+                val checked = if (update.lastSuccess > 0) java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(update.lastSuccess)) else "尚未成功检查"
+                Text("上次成功检查：$checked", style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateLastSuccess"))
+                Text("成功检查满 7 天后，下次打开应用时自动检查。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                update.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateStatus")) }
+            } } }
             item { OutlinedCard(onClick = { uriHandler.openUri("https://github.com/Kelejun/XATUHelper-Android") }, modifier = Modifier.fillMaxWidth().testTag("githubRepository")) {
                 ListItem(headlineContent = { Text("GitHub 仓库") }, supportingContent = { Text("Kelejun/XATUHelper-Android") }, leadingContent = { Icon(Icons.Default.Code, null) }, trailingContent = { Icon(Icons.Default.OpenInNew, "打开 GitHub 仓库") })
             } }
