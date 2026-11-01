@@ -321,23 +321,24 @@ import java.time.format.DateTimeFormatter
         if (state.table == null) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text(if (state.busy) "正在获取课表…" else "此学期尚无离线课表，请刷新或校准周次。", Modifier.padding(24.dp)) }
         else {
             val table = state.table
+            val courseColors = remember(table.courses) { CoursePalette.indices(table.courses.map { it.key }) }
             HorizontalPager(state = pager, modifier = Modifier.weight(1f).testTag("weekPager"), key = { it }) { page ->
                 val blocks = remember(table.courses, page) { blocksFor(table.courses, page + 1) }
-                WeekGrid(blocks, table.unitCount, LocalDate.parse(table.monday).plusWeeks(page.toLong()), showWeekend, onCourse)
+                WeekGrid(blocks, courseColors, table.unitCount, LocalDate.parse(table.monday).plusWeeks(page.toLong()), showWeekend, onCourse)
             }
             CacheLabel(table, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
         }
     }
 }
 
-@Composable private fun WeekGrid(blocks: List<CourseBlock>, units: Int, monday: LocalDate, weekend: Boolean, onCourse: (CourseBlock) -> Unit) {
+@Composable private fun WeekGrid(blocks: List<CourseBlock>, courseColors: Map<String, Int>, units: Int, monday: LocalDate, weekend: Boolean, onCourse: (CourseBlock) -> Unit) {
     val days = if (weekend) 7 else 5
     val fontScale = LocalDensity.current.fontScale.coerceAtLeast(1f)
     val row = (68 * fontScale).dp
     val header = (44 * fontScale).dp
     val gutter = 28.dp
     val lineColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = .45f)
-    val colors = listOf(MaterialTheme.colorScheme.primaryContainer to MaterialTheme.colorScheme.onPrimaryContainer, MaterialTheme.colorScheme.secondaryContainer to MaterialTheme.colorScheme.onSecondaryContainer, MaterialTheme.colorScheme.tertiaryContainer to MaterialTheme.colorScheme.onTertiaryContainer)
+    val colors = if (isSystemInDarkTheme()) CoursePalette.dark else CoursePalette.light
     val placements = remember(blocks) { placeBlocks(blocks) }
     BoxWithConstraints(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 6.dp)) {
         val dayWidth = (maxWidth - gutter) / days
@@ -361,9 +362,9 @@ import java.time.format.DateTimeFormatter
             } }
             placements.filter { it.block.day <= days }.forEach { placement ->
                 val block = placement.block
-                val color = colors[Math.floorMod(block.key.hashCode(), colors.size)]
+                val color = colors[courseColors.getValue(block.key)]
                 val width = dayWidth / placement.count
-                Surface(onClick = { onCourse(block) }, shape = RoundedCornerShape(9.dp), color = color.first, contentColor = color.second,
+                Surface(onClick = { onCourse(block) }, shape = RoundedCornerShape(9.dp), color = color.background, contentColor = color.content,
                     modifier = Modifier.offset(x = gutter + dayWidth * (block.day - 1) + width * placement.lane + 2.dp, y = header + row * (block.start - 1) + 2.dp)
                         .width(width - 4.dp).height(row * (block.end - block.start + 1) - 4.dp)
                         .semantics { contentDescription = "${block.name}，${block.room}，${block.periodText}" }) {
