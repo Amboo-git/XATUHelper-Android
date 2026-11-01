@@ -266,7 +266,6 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                 }
                 val checked = if (update.lastSuccess > 0) java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(update.lastSuccess)) else "尚未成功检查"
                 Text("上次成功检查：$checked", style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateLastSuccess"))
-                Text("成功检查满 7 天后，下次打开应用时自动检查。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 update.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateStatus")) }
             } } }
             item { OutlinedCard(onClick = { uriHandler.openUri("https://github.com/Kelejun/XATUHelper-Android") }, modifier = Modifier.fillMaxWidth().testTag("githubRepository")) {
