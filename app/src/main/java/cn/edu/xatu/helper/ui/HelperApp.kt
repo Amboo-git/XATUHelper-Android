@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.window.Popup
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -36,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import cn.edu.xatu.helper.BuildConfig
+import cn.edu.xatu.helper.data.updateNotesForDisplay
 import cn.edu.xatu.helper.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -66,21 +66,16 @@ import java.time.format.DateTimeFormatter
 
 @Composable internal fun UpdateNotification(update: UpdateUi, onDismiss: () -> Unit, onLinkFailed: () -> Unit) {
     val release = update.offer ?: return
+    val notes = remember(release.notes) { updateNotesForDisplay(release.notes) }
     var confirm by remember(release.version) { mutableStateOf(false) }
     var linkError by remember(release.version) { mutableStateOf(false) }
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
-    if (!confirm) Popup(alignment = Alignment.TopCenter) {
-        Snackbar(modifier = Modifier.safeDrawingPadding().padding(16.dp),
-            action = { TextButton(onClick = { confirm = true }) { Text("查看更新") } },
-            dismissAction = { TextButton(onClick = onDismiss) { Text("稍后") } }) {
-            Text("发现新版本 ${release.version}")
-        }
-    }
+    if (!confirm) InAppNoticeBanner("发现新版本 ${release.version}", action = "查看更新", onAction = { confirm = true }, onDismiss = onDismiss)
     if (confirm) AlertDialog(onDismissRequest = onDismiss,
         title = { Text("更新至 ${release.version}") },
         text = { Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("确认后将在浏览器中打开 GitHub Release 页面，由你下载并安装新版本。")
-            if (release.notes.isNotBlank()) Text(release.notes)
+            if (notes.isNotBlank()) Text(notes)
             if (linkError) Text("没有可打开 GitHub 的浏览器，请安装浏览器后重试。", color = MaterialTheme.colorScheme.error)
         } },
         confirmButton = { TextButton(onClick = {
@@ -125,16 +120,21 @@ import java.time.format.DateTimeFormatter
 @Composable private fun MainShell(state: UiState, model: HelperViewModel, onRelogin: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var page by rememberSaveable { mutableStateOf<String?>(null) }
+    var academicScope by rememberSaveable { mutableStateOf<String?>(null) }
     var showCalibration by remember { mutableStateOf(false) }
     var course by remember { mutableStateOf<CourseBlock?>(null) }
     val requestedPage by model.destination.collectAsStateWithLifecycle()
     LaunchedEffect(requestedPage) {
-        if (requestedPage != null) {
-            if (requestedPage == "timetable") { tab = 1; page = null } else { tab = 2; page = requestedPage }
+        val request = requestedPage
+        if (request != null) {
+            academicScope = request.substringAfter(':', "").ifEmpty { null }
+            val targetPage = request.substringBefore(':')
+            if (targetPage == "timetable") { tab = 1; page = null } else { tab = 2; page = targetPage }
             model.consumeDestination()
         }
     }
     val update by model.updateState.collectAsStateWithLifecycle()
+    LaunchedEffect(page) { if (page != "exams" && page != "grades") academicScope = null }
     val campusState = model.campus?.state?.collectAsStateWithLifecycle()?.value ?: CampusState()
     val titles = listOf("首页", "课程表", "校园")
     val icons = listOf(Icons.Default.Home, Icons.Default.CalendarMonth, Icons.Default.AccountBalance)
@@ -149,7 +149,7 @@ import java.time.format.DateTimeFormatter
         "notifications" -> model.campus?.let { ReminderScreen(it, { page = "settings" }) }
         "widgets" -> WidgetSettings({ page = "settings" }, campusState)
         in CampusLinks.pages.keys -> CampusWeb(destination!!, { model.browserClosed(); page = parentPage(destination) })
-        "exams", "grades", "plan" -> AcademicScreen(when (destination) { "exams" -> AcademicKind.EXAMS; "grades" -> AcademicKind.GRADES; else -> AcademicKind.PLAN }, state, model, { page = null }, onRelogin, { page = if (destination == "plan") "planWeb" else "eams" })
+        "exams", "grades", "plan" -> AcademicScreen(when (destination) { "exams" -> AcademicKind.EXAMS; "grades" -> AcademicKind.GRADES; else -> AcademicKind.PLAN }, state, model, { page = null }, onRelogin, { page = if (destination == "plan") "planWeb" else "eams" }, initialScope = academicScope)
         else -> Scaffold(topBar = {
         TopAppBar(title = { Text(titles[tab], fontWeight = FontWeight.SemiBold) }, actions = {
             if (tab == 1) IconButton(onClick = { showCalibration = true }, enabled = !state.busy) { Icon(Icons.Default.EditCalendar, "校准周次") }
@@ -203,11 +203,13 @@ import java.time.format.DateTimeFormatter
             }) { Text("开启提醒") } },
             dismissButton = { TextButton(onClick = { model.campus?.acknowledgeReminders(offerClasses) }) { Text("先不用") } })
     }
-    state.notice?.let { notice ->
-        LaunchedEffect(notice) { delay(6000); model.dismissNotice() }
-        Popup(alignment = Alignment.TopCenter) {
-            Snackbar(modifier = Modifier.safeDrawingPadding().padding(16.dp), dismissAction = { TextButton(onClick = model::dismissNotice) { Text("收起") } }) { Text(notice) }
-        }
+    // Display one banner at a time; academic notices retain their full lifetime after update dismissal.
+    if (update.offer == null) state.notice?.let { notice ->
+        AcademicNotification(notice, onOpen = {
+            if (notice.kind == AcademicKind.GRADES) model.gradeScope(notice.scope == "all")
+            model.openDestination("${if (notice.kind == AcademicKind.EXAMS) "exams" else "grades"}:${notice.scope}")
+            model.dismissNotice()
+        }, onDismiss = model::dismissNotice)
     }
     course?.let { selected ->
         ModalBottomSheet(onDismissRequest = { course = null }) {

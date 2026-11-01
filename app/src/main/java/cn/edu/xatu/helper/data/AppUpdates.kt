@@ -18,6 +18,9 @@ const val RELEASES_URL = "https://github.com/Kelejun/XATUHelper-Android/releases
 private const val RELEASE_API = "https://api.github.com/repos/Kelejun/XATUHelper-Android/releases/latest"
 
 data class AppRelease(val version: String, val notes: String, val url: String)
+
+/** Apply at display time so previously cached release bodies follow the same rule. */
+fun updateNotesForDisplay(notes: String): String = notes.substringBefore("附件：").substringBefore("附件:").trim()
 data class UpdateCache(
     val lastSuccess: Long = 0, val nextAttempt: Long = 0, val failures: Int = 0,
     val etag: String? = null, val release: AppRelease? = null

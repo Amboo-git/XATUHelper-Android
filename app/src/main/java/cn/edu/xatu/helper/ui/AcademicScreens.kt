@@ -24,8 +24,8 @@ private fun number(value: Double): String = String.format(Locale.CHINA, "%.2f", 
 private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZone(SchoolZone).format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun AcademicScreen(kind: AcademicKind, state: UiState, model: HelperViewModel, onBack: () -> Unit, onRelogin: () -> Unit, onWeb: () -> Unit) {
-    var selectedSemester by rememberSaveable(kind) { mutableStateOf("") }
+@Composable fun AcademicScreen(kind: AcademicKind, state: UiState, model: HelperViewModel, onBack: () -> Unit, onRelogin: () -> Unit, onWeb: () -> Unit, initialScope: String? = null) {
+    var selectedSemester by rememberSaveable(kind, initialScope) { mutableStateOf(initialScope?.takeUnless { it == "all" }.orEmpty()) }
     val semester = selectedSemester.ifEmpty { state.currentSemester.ifEmpty { state.selectedSemester } }
     val allGrades = state.allGrades
     var semesterMenu by remember { mutableStateOf(false) }

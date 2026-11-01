@@ -49,8 +49,4 @@ data class AcademicSnapshot(
     val grades: GradePage? = null, val plan: StudyPlan? = null, val catalog: List<CourseInfo> = emptyList(),
     val catalogWarning: String? = null
 )
-fun gradeChanges(previous: List<Grade>, current: List<Grade>): Int {
-    if (previous.isEmpty()) return 0
-    val old = previous.associateBy { it.id }
-    return current.count { it.score.isNotBlank() && (old[it.id] == null || old[it.id]?.score != it.score) }
-}
+fun gradeChanges(previous: List<Grade>, current: List<Grade>): Int = changedGrades(previous, current).size

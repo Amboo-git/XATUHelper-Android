@@ -16,6 +16,13 @@ class AppUpdatesTest {
         .addHeader("ETag", "\"release-1\"")
         .setBody("""{"tag_name":"$tag","draft":false,"prerelease":$prerelease,"body":"更新说明","html_url":"https://untrusted.example/download"}""")
 
+    @Test fun attachmentSectionIsExcludedFromDisplayedReleaseNotes() {
+        assertEquals("更新内容", updateNotesForDisplay("更新内容\n\n附件：\n- app.apk\n\n验证：通过"))
+        assertEquals("更新内容", updateNotesForDisplay("更新内容\n附件:\n下载链接"))
+        assertEquals("", updateNotesForDisplay("附件：\n下载链接"))
+        assertEquals("更新内容", updateNotesForDisplay("更新内容"))
+    }
+
     @Test fun stableVersionsCompareNumerically() {
         assertTrue(isNewerRelease("v1.10.0", "1.9.9"))
         assertTrue(isNewerRelease("2.0.0", "1.99.99"))

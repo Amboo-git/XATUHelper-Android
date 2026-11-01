@@ -13,7 +13,7 @@ data class AcademicUi(val data: AcademicSnapshot? = null, val loading: Boolean =
 fun academicKey(kind: AcademicKind, scope: String) = "${kind.name}:$scope"
 
 data class UiState(
-    val academic: Map<String, AcademicUi> = emptyMap(), val notice: String? = null, val allGrades: Boolean = false,
+    val academic: Map<String, AcademicUi> = emptyMap(), val notice: AcademicNotice? = null, val allGrades: Boolean = false,
     val showWeekend: Boolean = true, val showDiagnostics: Boolean = false, val currentSemester: String = "",
     val starting: Boolean = true, val account: String = "", val table: Timetable? = null,
     val semesters: List<Semester> = emptyList(), val selectedSemester: String = "", val kind: TableKind = TableKind.STUDENT,
@@ -184,14 +184,10 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
             try {
                 val snapshot = if (state.value.demo) demoAcademic(kind) else repository.refreshAcademic(account, kind, scope, forceCatalog = force)
                 if (state.value.demo) repository.store.saveAcademic(account, kind, scope, snapshot)
-                val changes = when (kind) {
-                    AcademicKind.EXAMS -> if (cached?.exams?.isNotEmpty() == true) snapshot.exams.count { exam -> cached.exams.none { it.id == exam.id } } else 0
-                    AcademicKind.GRADES -> gradeChanges(cached?.grades?.grades.orEmpty(), snapshot.grades?.grades.orEmpty())
-                    else -> 0
-                }
+                val notice = academicNotice(kind, scope, cached, snapshot)
                 publish(AcademicUi(snapshot))
                 runCatching { syncSystems() }
-                if (changes > 0 && state.value.account == account) mutable.update { it.copy(notice = if (kind == AcademicKind.EXAMS) "有 $changes 场新的考试安排" else "有 $changes 门课程的成绩已更新") }
+                if (notice != null && state.value.account == account) mutable.update { it.copy(notice = notice) }
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { publish(AcademicUi(cached, error = message(e), needsLogin = e is SessionExpired || e is WebLoginRequired)) }
         }
