@@ -1,0 +1,109 @@
+# XATUHelper-Android
+
+西安工业大学校园助手的独立原生 Android 工程。使用 Kotlin、Jetpack Compose 和官方 Material Design 3 组件，以 iOS XATUHelper 的业务行为为参考。工程不依赖 Swift、Skip 或原 iOS 工程。
+
+> iOS App 与 Widget 请前往 [XATUHelper](https://github.com/Kelejun/XATUHelper)。本仓库维护原生 Android 版，替代原 Skip 迁移版本。
+
+## 当前功能（0.4.0）
+
+- MD3 登录、首页、课程表、校园导航，动态配色与深色模式。
+- 统一身份认证密码登录；需要验证码或动态码时使用内置学校网页。
+- OkHttp 与 WebView 共享 Cookie，支持 HttpOnly、业务路径与加密会话快照；旧 WebView 保留网络响应 Cookie 的原始属性，恢复时保持主机／域范围。
+- 账号密码通过 Android Keystore 的 AES-GCM 加密保存在本机；退出登录清理凭据、Cookie 与课表缓存。
+- 学期列表、学生／班级课表、滑动翻周、前后周切换、直接跳周、返回本周／当前学生课表、持久保存周末显示。
+- 连续节次合并、课程重叠分栏、课程详情、第一周日期校准。
+- Room 按账号、学期和课表类型保存快照；优先显示缓存，失败保留旧数据。
+- 首页展示当天课程及进行状态、上完看明天；历史学期不充当今日安排，学期开始前不显示虚假的第一周课程。课表缓存超过 168 小时后尝试刷新。
+
+- 考试安排：按学期查看时间、考场和座位，首页显示已缓存的下一场考试。
+- 成绩：当前／历史学期和所有学期、搜索、分项成绩与教务绩点汇总；兼容尚未公布成绩的空表。
+- 学业完成情况：毕业学分、模块展开、课程搜索、开课学期筛选、课程性质和学时。
+- 教务数据按账号、类型和学期隔离缓存；新考试、新成绩变化以应用内提示展示。
+- 设置页集中账号、周次校准、周末、电费自动刷新和诊断复制；退出账号只出现在设置页；登录页采用校园助手整体介绍。
+
+- 电费：按项目、校区、楼栋、房间绑定宿舍，余额查询、每日记录（每宿舍最近 400 天）、近 7 天扣费／余额趋势、有效日均扣费和充值网页入口。
+- 校园网页：网费、电费充值、打卡、请假、教务和一站式大厅；打卡页按需请求位置权限。
+- 校历：官方原图下载、本机中文 OCR、离线原图和日期缓存；展示寒暑假范围，暑假以图中最后一天结束。
+- 提醒：上课提醒、考试前一晚／当天早晨／考前提醒，系统权限状态和开机恢复；默认关闭，真实账号首次进入课表／考试页提供一次提醒引导。
+- 桌面小组件：课程（切换今天／明天）、电费（主动刷新）和假期，点击进入对应页面。
+
+已绑定宿舍的页面只保留低强调的解除绑定入口；选择宿舍仅在未绑定时出现。
+
+从 0.1.0／0.2.0 更新使用 Room 1→2→3 增量迁移，保留账号、凭据和课表，不需要重新安装或清除数据。
+
+## 构建
+
+需要 JDK 17 或 21、Android SDK 36。最低支持 Android 8.0（API 26）。依赖版本固定，便于复现；Gradle Wrapper 已包含。
+
+1. 用 Android Studio 打开本目录，配置本机 SDK，或设置 `ANDROID_HOME`。
+2. 如需要，创建被 Git 忽略的 `local.properties`：`sdk.dir=/你的/Android/sdk`。
+3. 执行：
+
+```sh
+./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest :app:lintDebug
+./gradlew :app:assembleRelease
+```
+
+Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。
+Release APK：`app/build/outputs/apk/release/app-release-unsigned.apk`；开启 R8 和资源压缩，需要你自己的发布签名后才能分发。
+
+Debug 登录页提供明确标注的示例校园数据，便于无账号检查界面。示例数据不会访问学校。正式 Release 构建不提供示例入口。
+
+## 登录与离线使用
+
+填写学号、统一认证密码后点击「登录」。网页登录前同样需要填写学号，用于区分本地课表；请在网页中使用同一个学号，成功进入教务后点击「完成登录」。网页登录不保存你在网页输入的密码。
+
+周次优先使用本地校准日期、学期起始日期或已有缓存；当前学期缺少日期时从教务首页的官方教学周推算。取不到日期时会明确提示，可在登录页展开「周次校准」或课表页点日期校准按钮填写第一周周一。不会硬编码某个学期的开学日期。
+
+断网和登录失效时仍保留已有课表。首次选择没有缓存的历史学期或班级课表需要联网；缺少开学日期时需要校准。系统时间计算统一使用 Asia/Shanghai。
+
+## 结构
+
+```text
+app/src/main/java/cn/edu/xatu/helper/
+  data/       CAS、Cookie、网络、解析、Room、DataStore、Keystore、Repository
+  model/      课程、学期、周次、作息与重叠布局
+  ui/         MD3 界面、ViewModel、校园 WebView
+  platform/   AlarmManager 提醒、WorkManager 维护、AppWidget
+app/src/test/         解析、周次、AES 和 HTTP 协议测试
+app/src/androidTest/ 原生交互、完整数据流程、存储和 Cookie 测试
+app/schemas/          Room 数据库版本
+performance/          独立进程的优化构建 UIAutomator 检查
+```
+
+网络、HTML 解析和存储在后台执行；Compose 只消费不可变状态。按周过滤后再合并节次，避免单双周课程互相污染。认证串行处理，自动恢复最多每分钟一次、每小时三次；浏览页面不会触发反复登录。
+
+教务系统目前使用 HTTP，只对 `jwgl2018.xatu.edu.cn` 放行明文流量；其余连接维持 HTTPS 校验。Debug／Benchmark 为本地集成测试额外允许 localhost，Release 不包含此例外。不会忽略 TLS 证书错误。
+
+## 验证
+
+见 [真机补测](VALIDATION-PHYSICAL.md)、[最终阶段检查](VALIDATION-FINAL.md) 和 [iOS 逐项对齐表](PARITY-IOS.md)；[阶段 7–10 验证记录](VALIDATION-STAGES7-10.md)；[第二阶段记录](VALIDATION-STAGE2.md)；[首阶段历史记录](VALIDATION.md) 保留原始测量条件。真实账号和真机验收与模拟数据、模拟器测试分开记录。
+
+```sh
+python3 scripts/offline-smoke.py --adb /你的/adb
+```
+
+离线脚本默认仅操作模拟器 .qa 包的示例账号，检查后恢复网络、明暗模式与字体设置。
+
+```sh
+# 构建并运行独立 .qa 包测试；不清空已登录的主应用
+ADB=/你的/adb scripts/device-tests.sh qa
+
+# 优化构建：非 debuggable、R8、资源压缩、独立 .benchmark 包名
+ADB=/你的/adb scripts/device-tests.sh benchmark
+```
+
+真机 QA 使用显式设备序列号，独立安装并重置 `.qa` 包，不清除主应用，也不切换手机网络：
+
+```sh
+JAVA_HOME=/你的/JDK21 ADB=/你的/adb scripts/physical-tests.sh 设备序列号
+```
+
+这条命令包含示例数据测试，不等同于真实教务账号验收。手机需先开启 USB 调试并允许此电脑，界面测试开始前保持解锁；日志和截图单独保存到 `artifacts/qa/physical/`。模拟器脚本在同时连接手机时也会显式选中唯一模拟器。
+
+Benchmark 使用本机 debug key 签名，仅供测量；其示例入口不会出现在正式 Release 中。Debug 短采样来自 Window；Benchmark 由独立 UIAutomator 进程注入实际触摸事件并保存 gfxinfo。模拟器软件渲染会影响结果，不等同于真机帧率。
+
+## 许可
+
+MIT。课表协议与解析规则参考原 XATUHelper；保留原作者版权声明，见 [LICENSE](LICENSE)。

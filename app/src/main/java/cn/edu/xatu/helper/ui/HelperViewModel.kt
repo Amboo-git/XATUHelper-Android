@@ -1,0 +1,196 @@
+package cn.edu.xatu.helper.ui
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import cn.edu.xatu.helper.BuildConfig
+import cn.edu.xatu.helper.data.*
+import cn.edu.xatu.helper.model.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import java.time.LocalDate
+
+data class AcademicUi(val data: AcademicSnapshot? = null, val loading: Boolean = false, val error: String? = null, val needsLogin: Boolean = false)
+fun academicKey(kind: AcademicKind, scope: String) = "${kind.name}:$scope"
+
+data class UiState(
+    val academic: Map<String, AcademicUi> = emptyMap(), val notice: String? = null, val allGrades: Boolean = false,
+    val showWeekend: Boolean = true, val showDiagnostics: Boolean = false, val currentSemester: String = "",
+    val starting: Boolean = true, val account: String = "", val table: Timetable? = null,
+    val semesters: List<Semester> = emptyList(), val selectedSemester: String = "", val kind: TableKind = TableKind.STUDENT,
+    val week: Int = 1, val busy: Boolean = false, val error: String? = null,
+    val webAccount: String = "", val needsLogin: Boolean = false, val showWebLogin: Boolean = false, val demo: Boolean = false
+)
+
+class HelperViewModel(private val repository: TimetableRepository, campusRepository: CampusRepository? = null, private val syncSystems: suspend () -> Unit = {}) : ViewModel() {
+    private val mutable = MutableStateFlow(UiState())
+    val state = mutable.asStateFlow()
+    val campus = campusRepository?.let { CampusController(it, viewModelScope, syncSystems) }
+    val destination = MutableStateFlow<String?>(null)
+    fun browserClosed() { viewModelScope.launch { repository.saveBrowserCookies(); campus?.load(); runCatching { syncSystems() } } }
+    fun openDestination(page: String?) { if (page != null) destination.value = page }
+    fun consumeDestination() { destination.value = null }
+    fun resume() { if (state.value.starting) return; viewModelScope.launch { campus?.load(); runCatching { syncSystems() } } }
+    private var request: Job? = null
+    private val academicJobs = mutableMapOf<String, Job>()
+    init {
+        request = viewModelScope.launch {
+            try {
+                repository.initialize()
+                val account = repository.store.account()
+                val (semester, kind) = repository.store.selection()
+                val table = repository.store.table(account, semester, kind)
+                val demo = account == "__demo__" && BuildConfig.DEMO_ENABLED
+                mutable.value = UiState(starting = false, account = account, table = table, semesters = repository.store.semesters(), selectedSemester = semester, kind = kind,
+                    week = table?.let { weekOf(LocalDate.parse(it.monday), schoolToday()) } ?: 1, demo = demo,
+                    currentSemester = repository.store.currentSemester(account),
+                    showWeekend = repository.store.extra("showWeekend", Boolean::class.javaObjectType) ?: true,
+                    showDiagnostics = repository.store.extra("showDiagnostics", Boolean::class.javaObjectType) ?: false)
+                warmExams()
+                campus?.load()
+                runCatching { syncSystems() }
+                // Cache first. Avoid login requests on every screen or process restart.
+                if (table != null && !demo && System.currentTimeMillis() - table.fetchedAt > 168L * 3600 * 1000) refresh()
+            } catch (e: Exception) { mutable.update { it.copy(starting = false, error = message(e)) } }
+        }
+    }
+    private fun message(e: Exception) = when (e) {
+        is java.net.UnknownHostException -> "无法连接学校服务器，请检查网络；已保存的课表仍可离线查看。"
+        is java.net.SocketTimeoutException -> "学校服务器响应超时，请稍后重试。"
+        is javax.net.ssl.SSLException -> "无法验证学校服务器的安全连接，请稍后重试或使用网页登录。"
+        else -> e.message?.take(200) ?: "操作失败，请重试"
+    }
+    private fun action(block: suspend () -> Unit) {
+        if (mutable.value.busy) return
+        mutable.update { it.copy(busy = true, error = null) }
+        request = viewModelScope.launch {
+            try { block() } catch (e: CancellationException) { throw e }
+            catch (e: WebLoginRequired) { mutable.update { it.copy(showWebLogin = true, webAccount = it.webAccount.ifBlank { it.account }) } }
+            catch (e: SessionExpired) { mutable.update { it.copy(needsLogin = true, error = message(e)) } }
+            catch (e: Exception) { mutable.update { it.copy(error = message(e)) } }
+            finally { mutable.update { it.copy(busy = false) } }
+        }
+    }
+    private fun cancelAcademic() { academicJobs.values.forEach { it.cancel() }; academicJobs.clear() }
+    fun login(account: String, password: String, firstMonday: String) {
+        if (account.isBlank() || password.isEmpty()) { mutable.update { it.copy(error = "请填写学号和密码") }; return }
+        cancelAcademic()
+        mutable.update { it.copy(webAccount = account.trim()) }
+        action { accept(repository.login(account.trim(), password, parseMonday(firstMonday))) }
+    }
+    private fun parseMonday(text: String): LocalDate? = if (text.isBlank()) null else runCatching { LocalDate.parse(text) }.getOrElse { throw IllegalArgumentException("日期格式应为 yyyy-MM-dd，例如 2026-09-07") }
+    fun openWeb(account: String) {
+        if (account.isBlank()) { mutable.update { it.copy(error = "请先填写学号，用于区分本地课表") }; return }
+        cancelAcademic()
+        action { repository.beginWebLogin(); mutable.update { it.copy(webAccount = account.trim(), showWebLogin = true, error = null) } }
+    }
+    fun finishWeb(firstMonday: String) {
+        mutable.update { it.copy(showWebLogin = false) }
+        action { accept(repository.completeWebLogin(mutable.value.webAccount, parseMonday(firstMonday))) }
+    }
+    fun closeWeb() { mutable.update { it.copy(showWebLogin = false) } }
+    fun webError(message: String) { mutable.update { it.copy(error = message) } }
+    private suspend fun accept(table: Timetable) {
+        val semesters = repository.store.semesters()
+        val currentSemester = repository.store.currentSemester(table.account)
+        mutable.update { it.copy(allGrades = if (it.account == table.account) it.allGrades else false, academic = if (it.account == table.account) it.academic else emptyMap(), account = table.account, currentSemester = currentSemester, webAccount = table.account, table = table, semesters = semesters, selectedSemester = table.semester.id, kind = table.kind, needsLogin = false, demo = table.account == "__demo__", week = weekOf(LocalDate.parse(table.monday), schoolToday())) }
+        warmExams()
+        campus?.load()
+        runCatching { syncSystems() }
+    }
+    fun select(semester: String, kind: TableKind) {
+        if (state.value.busy || (semester == state.value.selectedSemester && kind == state.value.kind)) return
+        action {
+            val cached = repository.store.table(state.value.account, semester, kind)
+            mutable.update { it.copy(selectedSemester = semester, kind = kind, table = cached) }
+            if (cached != null) { accept(cached); repository.store.select(cached.account, semester, kind) }
+            if (!state.value.demo) accept(repository.refresh(state.value.account, semester, kind))
+        }
+    }
+    fun refresh() {
+        if (state.value.demo) return
+        action { val s = state.value; accept(repository.refresh(s.account, s.selectedSemester, s.kind)) }
+    }
+    fun showWeekend(value: Boolean) {
+        mutable.update { it.copy(showWeekend = value) }
+        viewModelScope.launch { repository.store.extra("showWeekend", value) }
+    }
+    fun showDiagnostics(value: Boolean) {
+        mutable.update { it.copy(showDiagnostics = value) }
+        viewModelScope.launch { repository.store.extra("showDiagnostics", value) }
+    }
+    fun gradeScope(all: Boolean) { mutable.update { it.copy(allGrades = all) } }
+    fun calibrateWeek(week: Int) = calibrate(mondayForWeek(week).toString())
+    fun changeWeek(value: Int) { mutable.update { it.copy(week = value.coerceIn(1, 30)) } }
+    fun calibrate(date: String) { action {
+        val start = parseMonday(date) ?: throw IllegalArgumentException("请填写第一周周一的日期")
+        val s = state.value
+        repository.setMonday(s.account, s.selectedSemester, start)
+        s.table?.let { accept(repository.calibrate(it, start)) } ?: accept(repository.refresh(s.account, s.selectedSemester, s.kind))
+    } }
+    fun logout() { action {
+        academicJobs.values.forEach { it.cancel() }; academicJobs.clear()
+        repository.logout(); mutable.value = UiState(starting = false); campus?.load(); runCatching { syncSystems() }
+    } }
+    fun dismissNotice() { mutable.update { it.copy(notice = null) } }
+    private suspend fun warmExams() {
+        val s = state.value
+        repository.store.academic(s.account, AcademicKind.EXAMS, s.currentSemester)?.let { snapshot ->
+            mutable.update { if (it.account == s.account && it.currentSemester == s.currentSemester) it.copy(academic = it.academic + (academicKey(AcademicKind.EXAMS, s.currentSemester) to AcademicUi(snapshot))) else it }
+        }
+    }
+    fun loadAcademic(kind: AcademicKind, scope: String, force: Boolean = false) {
+        val account = state.value.account
+        val key = academicKey(kind, scope)
+        if (account.isBlank() || academicJobs[key]?.isActive == true) return
+        academicJobs[key] = viewModelScope.launch {
+            fun publish(reading: AcademicUi) { mutable.update { if (it.account == account) it.copy(academic = it.academic + (key to reading)) else it } }
+            val cached = try { state.value.academic[key]?.data ?: repository.store.academic(account, kind, scope) }
+                catch (e: CancellationException) { throw e }
+                catch (e: Exception) { publish(AcademicUi(error = message(e))); return@launch }
+            publish(AcademicUi(cached))
+            if (!force && cached != null && System.currentTimeMillis() - cached.fetchedAt < kind.hours * 3_600_000) return@launch
+            publish(AcademicUi(cached, loading = true))
+            try {
+                val snapshot = if (state.value.demo) demoAcademic(kind) else repository.refreshAcademic(account, kind, scope, forceCatalog = force)
+                if (state.value.demo) repository.store.saveAcademic(account, kind, scope, snapshot)
+                val changes = when (kind) {
+                    AcademicKind.EXAMS -> if (cached?.exams?.isNotEmpty() == true) snapshot.exams.count { exam -> cached.exams.none { it.id == exam.id } } else 0
+                    AcademicKind.GRADES -> gradeChanges(cached?.grades?.grades.orEmpty(), snapshot.grades?.grades.orEmpty())
+                    else -> 0
+                }
+                publish(AcademicUi(snapshot))
+                runCatching { syncSystems() }
+                if (changes > 0 && state.value.account == account) mutable.update { it.copy(notice = if (kind == AcademicKind.EXAMS) "有 $changes 场新的考试安排" else "有 $changes 门课程的成绩已更新") }
+            } catch (e: CancellationException) { throw e }
+            catch (e: Exception) { publish(AcademicUi(cached, error = message(e), needsLogin = e is SessionExpired || e is WebLoginRequired)) }
+        }
+    }
+    private fun demoAcademic(kind: AcademicKind): AcademicSnapshot {
+        val courses = listOf(
+            PlanCourse("d1", "MATH01", "高等数学", 5.0, 5.0, "88", true),
+            PlanCourse("d2", "CS01", "程序设计", 4.0, 4.0, "92", true),
+            PlanCourse("d3", "PHYS01", "大学物理", 4.0, 0.0, "", false)
+        )
+        return when (kind) {
+            AcademicKind.EXAMS -> AcademicSnapshot(exams = listOf(Exam("e1", "高等数学", "MATH01", "期末考试", "${schoolToday().plusDays(14)} 09:00–11:00", "教1-101", "12", "携带学生证")))
+            AcademicKind.GRADES -> AcademicSnapshot(grades = GradePage(listOf(Grade("g1", "高等数学", "MATH01", "5", "88", "3.8", "示例学期", listOf(GradePart("平时成绩", "90"), GradePart("期末成绩", "87"))), Grade("g2", "程序设计", "CS01", "4", "92", "4.2", "示例学期", emptyList())), GradeSummary(2, 9.0, 3.98)))
+            AcademicKind.PLAN -> AcademicSnapshot(plan = StudyPlan("示例同学", "示例专业", "3.98", 160.0, 96.0, listOf(PlanSection("module1", "学科基础", 13.0, 9.0, courses, emptyList()))), catalog = listOf(CourseInfo("MATH01", "高等数学", "必修", "5", "80", "1"), CourseInfo("CS01", "程序设计", "必修", "4", "64", "2"), CourseInfo("PHYS01", "大学物理", "必修", "4", "64", "2")))
+        }
+    }
+    fun clearError() { mutable.update { it.copy(error = null) } }
+    fun demo() {
+        if (!BuildConfig.DEMO_ENABLED) return
+        cancelAcademic()
+        action {
+            val start = mondayOf(schoolToday()).minusWeeks(7)
+            val semester = Semester("demo", "示例学期", start.toString())
+            val courses = listOf(
+                Triple("高等数学", 1, 1), Triple("大学英语", 2, 3), Triple("程序设计", 3, 5),
+                Triple("大学物理", 4, 1), Triple("线性代数", 5, 3), Triple("体育", 2, 7), Triple("实验课程", 5, 9), Triple("课程讨论", 7, 5)
+            ).flatMapIndexed { index, (name, day, period) -> (period..period + 1).map { Course("DEMO$index", name, "示例教师", "教${index % 3 + 1}-${100 + index}", day, it, (1..18).toList()) } }
+            val table = Timetable("__demo__", semester, TableKind.STUDENT, courses, 12, start.toString(), System.currentTimeMillis())
+            repository.store.save(table); repository.store.semesters(listOf(semester)); repository.store.select(table.account, semester.id, table.kind)
+            accept(table)
+        }
+    }
+}
