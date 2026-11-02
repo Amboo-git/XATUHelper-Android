@@ -309,7 +309,7 @@ import java.time.format.DateTimeFormatter
             Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("下一场考试", style = MaterialTheme.typography.labelLarge); Text(nextExam.course, style = MaterialTheme.typography.titleLarge); Text(nextExam.time); Text(nextExam.room) }
         } }
         item { OutlinedCard(onClick = { onAcademic("electricity") }, modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("宿舍电费", style = MaterialTheme.typography.labelLarge); Text(campus.electric?.let { "¥ ${it.balance}" } ?: "选择宿舍查看余额", style = MaterialTheme.typography.titleLarge); campus.dorm?.let { Text(it.label) } }
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text("宿舍电费", style = MaterialTheme.typography.labelLarge); Text(campus.electric?.let { "${it.balance} 度" } ?: "选择宿舍查看余额", style = MaterialTheme.typography.titleLarge); campus.dorm?.let { Text(it.label) } }
         } }
         val activeBreak = nextBreak(campus.calendar, now.toLocalDate())?.takeIf { it.start <= now.toLocalDate() }
         val event = nextCampusEvent(campus.calendar, now.toLocalDate())

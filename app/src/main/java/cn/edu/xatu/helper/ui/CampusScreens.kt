@@ -74,8 +74,8 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = if (state.electric?.balance?.toBigDecimalOrNull()?.let { it < 10.toBigDecimal() } == true) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("宿舍余额", style = MaterialTheme.typography.titleMedium)
-                        AnimatedContent(state.electric?.let { "¥ ${it.balance}" } ?: "—", label = "electricBalance") { balance ->
+                        Text("剩余电量", style = MaterialTheme.typography.titleMedium)
+                        AnimatedContent(state.electric?.let { "${it.balance} 度" } ?: "—", label = "electricBalance") { balance ->
                             Text(balance, style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag("electricBalance"))
                         }
                         Text(state.dorm?.label ?: "还未选择宿舍")
@@ -99,11 +99,11 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
             if (state.dorm != null) {
                 item { Row(verticalAlignment = Alignment.CenterVertically) { Text("每日自动更新余额", Modifier.weight(1f)); Switch(state.autoElectric, controller::autoElectric, enabled = !state.busy) } }
                 item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(usageChart, { usageChart = true }, label = { Text("近七天扣费") })
+                    FilterChip(usageChart, { usageChart = true }, label = { Text("近七天用电") })
                     FilterChip(!usageChart, { usageChart = false }, label = { Text("余额趋势") })
                 } }
                 item {
-                    Text(if (usageChart) "近七天扣费估算（元）" else "近七天余额（元）", style = MaterialTheme.typography.titleMedium)
+                    Text(if (usageChart) "近七天用电估算（度）" else "近七天余额（度）", style = MaterialTheme.typography.titleMedium)
                     val records = if (usageChart) state.history.mapIndexedNotNull { index, record ->
                         dailyDeduction(state.history.getOrNull(index - 1), record)?.let { DailyBalance(record.day, it.toPlainString()) }
                     } else state.history
@@ -111,15 +111,15 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
                     BalanceChart(recent, usageChart)
                     if (usageChart && recent.isNotEmpty()) {
                         val average = recent.sumOf { it.balance.toBigDecimal() }.divide(recent.size.toBigDecimal(), 2, java.math.RoundingMode.HALF_UP)
-                        Text("有记录的 ${recent.size} 天平均扣费 ¥ $average", style = MaterialTheme.typography.bodySmall)
+                        Text("有记录的 ${recent.size} 天平均用电 $average 度", style = MaterialTheme.typography.bodySmall)
                     }
                 }
-                item { Text("历史由本机每日查询生成；相邻两天余额下降为扣费估算，余额上升视为充值，不等同于用电量。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                item { Text("历史由本机每日查询生成；相邻两天电量下降为用电估算，电量上升视为充值补电，缺少相邻日记录时不推算用量。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 items(state.history.asReversed(), key = { it.day }) { record ->
                     val index = state.history.indexOf(record)
                     val used = dailyDeduction(state.history.getOrNull(index - 1), record)
                     if (index == state.history.lastIndex || state.history.getOrNull(index + 1)?.day?.take(7) != record.day.take(7)) Text(record.day.take(7), style = MaterialTheme.typography.titleMedium)
-                    ListItem(headlineContent = { Text(record.day) }, trailingContent = { Text("¥ ${record.balance}") }, supportingContent = { Text(used?.let { "较昨日扣费约 ¥ ${it.toPlainString()}" } ?: "充值或缺少相邻日记录") })
+                    ListItem(headlineContent = { Text(record.day) }, trailingContent = { Text("${record.balance} 度") }, supportingContent = { Text(used?.let { "较昨日用电约 ${it.toPlainString()} 度" } ?: "充值或缺少相邻日记录") })
                 }
                 item { TextButton(onClick = { confirmUnbind = true }, enabled = !state.busy) { Text("解除宿舍绑定") } }
             }
@@ -139,8 +139,8 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
     val points = records.mapNotNull { r -> r.balance.toFloatOrNull()?.let { r.day to it } }
     val color = MaterialTheme.colorScheme.primary
     if (points.isEmpty()) { Text("累计查询两天后显示趋势", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant); return }
-    Text(points.joinToString("；") { "${it.first.takeLast(5)} ¥ ${it.second}" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Canvas(Modifier.fillMaxWidth().height(120.dp).padding(12.dp).semantics { contentDescription = if (usage) "每日扣费估算图" else "每日余额趋势图" }) {
+    Text(points.joinToString("；") { "${it.first.takeLast(5)} ${it.second} 度" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Canvas(Modifier.fillMaxWidth().height(120.dp).padding(12.dp).semantics { contentDescription = if (usage) "每日用电估算图" else "每日余额趋势图" }) {
         val min = points.minOf { it.second }; val max = points.maxOf { it.second }; val range = (max - min).coerceAtLeast(1f)
         val first = LocalDate.parse(points.first().first)
         val days = ChronoUnit.DAYS.between(first, LocalDate.parse(points.last().first)).toFloat().coerceAtLeast(1f)

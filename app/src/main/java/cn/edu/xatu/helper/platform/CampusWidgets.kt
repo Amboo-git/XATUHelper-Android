@@ -38,7 +38,7 @@ object CampusWidgets {
                     }
                     "electricity" -> {
                         val electric = app.campusRepository.electricity(account)
-                        body = electric?.let { "¥ ${it.balance}" } ?: "请在 App 中选择宿舍"
+                        body = electric?.let { "${it.balance} 度" } ?: "请在 App 中选择宿舍"
                         subtitle = electric?.let { it.dorm.building.name + " " + it.dorm.room.name + " · " + Instant.ofEpochMilli(it.checkedAt).atZone(SchoolZone).format(java.time.format.DateTimeFormatter.ofPattern("MM-dd HH:mm")) } ?: "点击绑定宿舍"
                         options.getString("electricError", null)?.let { subtitle = it }
                         action = "刷新余额"
