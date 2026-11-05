@@ -1,6 +1,5 @@
 package cn.edu.xatu.helper.ui
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
@@ -88,8 +87,8 @@ import java.time.format.DateTimeFormatter
     var account by rememberSaveable { mutableStateOf(state.account.takeUnless { it == "__demo__" }.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
-    onBack?.let { BackHandler(onBack = it) }
-    Surface(Modifier.fillMaxSize()) {
+    val backModifier = Modifier.predictiveBack(enabled = onBack != null) { onBack?.invoke() }
+    Surface(Modifier.fillMaxSize().then(backModifier)) {
         Column(Modifier.safeDrawingPadding().imePadding().fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Spacer(Modifier.height(24.dp))
             Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(80.dp)) {
@@ -138,11 +137,11 @@ import java.time.format.DateTimeFormatter
     val campusState = model.campus?.state?.collectAsStateWithLifecycle()?.value ?: CampusState()
     val titles = listOf("首页", "课程表", "校园")
     val icons = listOf(Icons.Default.Home, Icons.Default.CalendarMonth, Icons.Default.AccountBalance)
-    BackHandler(enabled = page != null || tab != 0) { if (page != null) page = parentPage(page) else tab = 0 }
+    val backModifier = Modifier.predictiveBack(enabled = page != null || tab != 0) { if (page != null) page = parentPage(page) else tab = 0 }
     var previousPage by remember { mutableStateOf(page) }
     val direction = remember(page) { if (page == null || parentPage(previousPage) == page) -1 else 1 }
     SideEffect { previousPage = page }
-    ScreenTransition(page, direction = direction) { destination -> when (destination) {
+    ScreenTransition(page, modifier = backModifier, direction = direction) { destination -> when (destination) {
         "settings" -> SettingsScreen(state, { page = null }, { showCalibration = true }, onRelogin, model::logout, { page = "notifications" }, { page = "widgets" }, model::showWeekend, model::showDiagnostics, campusState, { model.campus?.autoElectric(it) }, update, { model.checkUpdates(manual = true) })
         "electricity" -> model.campus?.let { ElectricityScreen(it, { page = null }, { page = "charge" }) }
         "calendar" -> model.campus?.let { CalendarScreen(it, { page = null }) }

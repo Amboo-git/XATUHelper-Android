@@ -2,8 +2,6 @@ package cn.edu.xatu.helper.ui
 
 import android.Manifest
 import android.app.AlarmManager
-import android.appwidget.AppWidgetManager
-import android.content.ComponentName
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -249,17 +247,33 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
 @Composable fun WidgetSettings(onBack: () -> Unit, state: CampusState) {
     val context = LocalContext.current
     var message by remember { mutableStateOf<String?>(null) }
+    var pending by remember { mutableStateOf<Class<out CampusWidgetProvider>?>(null) }
+    DisposableEffect(context) {
+        val preferences = context.getSharedPreferences("widget_options", android.content.Context.MODE_PRIVATE)
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == WidgetPinning.CONFIRMED) message = "小组件已添加到桌面。"
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    fun openPermissions() {
+        if (!WidgetPinning.openPermissionSettings(context)) message = "无法打开设置，请手动进入系统设置 → 应用 → XATU Helper → 权限。"
+    }
     CampusFrame("桌面小组件", state, onBack) {
-        Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("课程、电费和假期数据来自本机缓存。小组件点击可进入对应页面，课程支持上完后查看明天，电费支持刷新。")
+        Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("课程、电费和假期数据来自本机缓存。小组件点击可进入对应页面，课程支持上完后查看明天，电费支持刷新。Android 12 及以上跟随系统壁纸配色和深浅模式。")
+            Text(WidgetPinning.PERMISSION_HELP)
+            OutlinedButton(onClick = { openPermissions() }, modifier = Modifier.fillMaxWidth()) { Text("桌面添加权限设置") }
             listOf("课程" to CourseWidget::class.java, "宿舍电费" to ElectricityWidget::class.java, "假期倒计时" to HolidayWidget::class.java).forEach { (label, cls) ->
-                OutlinedButton(onClick = {
-                    val manager = AppWidgetManager.getInstance(context)
-                    if (manager.isRequestPinAppWidgetSupported) manager.requestPinAppWidget(ComponentName(context, cls), null, null)
-                    else message = "请长按桌面，进入小组件列表添加「XATU Helper」。"
-                }, modifier = Modifier.fillMaxWidth()) { Text("添加$label") }
+                OutlinedButton(onClick = { pending = cls }, modifier = Modifier.fillMaxWidth()) { Text("添加$label") }
             }
             message?.let { Text(it) }
         }
+    }
+    pending?.let { provider ->
+        AlertDialog(onDismissRequest = { pending = null }, title = { Text("申请添加桌面小组件") },
+            text = { Text(WidgetPinning.PERMISSION_HELP) },
+            confirmButton = { TextButton(onClick = { pending = null; message = WidgetPinning.request(context, provider) }) { Text("申请添加") } },
+            dismissButton = { TextButton(onClick = { openPermissions() }) { Text("先开启权限") } })
     }
 }

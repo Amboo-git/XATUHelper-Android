@@ -3,7 +3,6 @@ package cn.edu.xatu.helper.ui
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.webkit.*
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -21,9 +20,9 @@ import cn.edu.xatu.helper.data.SchoolUrls
     var loading by remember { mutableStateOf(true) }
     var landed by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-    BackHandler { if (web?.canGoBack() == true) web?.goBack() else onClose() }
+    val backModifier = Modifier.predictiveBack { if (web?.canGoBack() == true) web?.goBack() else onClose() }
     DisposableEffect(Unit) { onDispose { web?.apply { stopLoading(); webViewClient = WebViewClient(); destroy() }; web = null } }
-    Scaffold(topBar = {
+    Scaffold(modifier = backModifier, topBar = {
         TopAppBar(title = { Text("统一身份认证") }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭网页登录") } },
             actions = { TextButton(onClick = onComplete, enabled = landed && !loading) { Text("完成登录") } })
     }) { padding ->

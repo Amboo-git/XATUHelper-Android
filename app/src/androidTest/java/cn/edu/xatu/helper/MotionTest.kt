@@ -16,11 +16,24 @@ import cn.edu.xatu.helper.ui.Reveal
 import cn.edu.xatu.helper.ui.ScreenTransition
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 
 class MotionTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+
+    @Before fun keepTestActivityVisible() {
+        compose.runOnUiThread {
+            // Scope wake/keep-awake to this QA activity; do not change device settings.
+            compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (android.os.Build.VERSION.SDK_INT >= 27) {
+                compose.activity.setTurnScreenOn(true)
+                compose.activity.setShowWhenLocked(true)
+            }
+        }
+    }
+
 
     @Test fun enteringScreenActuallyRendersIntermediateFrames() {
         assumeTrue(Settings.Global.getFloat(compose.activity.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f)

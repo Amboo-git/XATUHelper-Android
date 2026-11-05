@@ -74,6 +74,12 @@ object CampusWidgets {
 }
 open class CampusWidgetProvider : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == WidgetPinning.PINNED) {
+            context.getSharedPreferences("widget_options", Context.MODE_PRIVATE).edit()
+                .putLong(WidgetPinning.CONFIRMED, System.currentTimeMillis()).apply()
+            update(context)
+            return
+        }
         if (intent.action == "cn.edu.xatu.helper.REFRESH_ELECTRICITY") { SystemCoordinator.refreshElectricity(context); return }
         if (intent.action == "cn.edu.xatu.helper.TOGGLE_TOMORROW") {
             val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, -1)
