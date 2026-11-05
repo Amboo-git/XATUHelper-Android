@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Rule
 import cn.edu.xatu.helper.model.schoolToday
 import org.junit.Test
@@ -19,6 +20,24 @@ import java.util.Collections
 @RunWith(AndroidJUnit4::class)
 class MilestoneTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
+    @Before fun startAtQaLogin() {
+        check(BuildConfig.APPLICATION_ID.endsWith(".qa"))
+        compose.runOnUiThread {
+            compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            if (android.os.Build.VERSION.SDK_INT >= 27) {
+                compose.activity.setShowWhenLocked(true)
+                compose.activity.setTurnScreenOn(true)
+            }
+        }
+        lateinit var model: cn.edu.xatu.helper.ui.HelperViewModel
+        compose.runOnUiThread { model = androidx.lifecycle.ViewModelProvider(compose.activity)[cn.edu.xatu.helper.ui.HelperViewModel::class.java] }
+        compose.waitUntil(10000) { !model.state.value.starting && !model.state.value.busy }
+        if (model.state.value.account.isNotBlank()) {
+            compose.runOnIdle { model.logout() }
+            compose.waitUntil(10000) { model.state.value.account.isBlank() && !model.state.value.busy }
+        }
+    }
+
     @Test fun loginValidationDemoNavigationTimetableAndRecreation() {
         compose.runOnUiThread { compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
         compose.waitUntil(15000) { compose.onAllNodesWithTag("demo").fetchSemanticsNodes().isNotEmpty() }
@@ -31,6 +50,7 @@ class MilestoneTest {
         compose.waitUntil(10000) { compose.onAllNodesWithTag("tab1").fetchSemanticsNodes().isNotEmpty() }
         screenshot("home-light.png")
         compose.onNodeWithTag("tab1").performClick()
+        compose.waitUntil(10000) { compose.onAllNodesWithTag("week").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithTag("week").assertTextEquals("第 8 周")
         compose.onNodeWithTag("periodStart3").assertTextEquals("10:10/\n10:20").assertContentDescriptionEquals("10:10/10:20")
         compose.onNodeWithContentDescription("校准周次").performClick()
@@ -105,9 +125,12 @@ class MilestoneTest {
         compose.onNodeWithContentDescription("返回校园").performClick()
         compose.onNodeWithContentDescription("设置").performClick()
         compose.onNodeWithText("示例账号").assertIsDisplayed()
-        compose.onNodeWithTag("diagnosticsSetting").performScrollTo().performClick()
-        compose.onNodeWithTag("diagnostics").performScrollTo().assertIsDisplayed()
-        compose.onNodeWithText("复制诊断数据").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("diagnosticsSetting"))
+        compose.onNodeWithTag("diagnosticsSetting").performClick()
+        compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("diagnostics"))
+        compose.onNodeWithTag("diagnostics").assertIsDisplayed()
+        compose.onNodeWithTag("settings").performScrollToNode(hasText("复制诊断数据"))
+        compose.onNodeWithText("复制诊断数据").assertIsDisplayed()
         screenshot("diagnostics.png")
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("appVersion"))
         compose.onNodeWithTag("appVersion").assertTextEquals("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})")
@@ -165,11 +188,13 @@ class MilestoneTest {
         screenshot("calendar.png")
         compose.onNodeWithContentDescription("返回校园").performClick()
         compose.onNodeWithContentDescription("设置").performClick()
-        compose.onNodeWithText("提醒设置").performScrollTo().performClick()
+        compose.onNodeWithTag("settings").performScrollToNode(hasText("提醒设置"))
+        compose.onNodeWithText("提醒设置").performClick()
         compose.onNodeWithText("上课提醒").assertIsDisplayed()
         screenshot("reminders.png")
         compose.onNodeWithContentDescription("返回校园").performClick()
-        compose.onNodeWithText("桌面小组件").performScrollTo().performClick()
+        compose.onNodeWithTag("settings").performScrollToNode(hasText("桌面小组件"))
+        compose.onNodeWithText("桌面小组件").performClick()
         compose.onNodeWithText("添加课程").assertIsDisplayed()
         screenshot("widget-settings.png")
         // Copy last so the Android clipboard overlay does not obscure later screenshots.

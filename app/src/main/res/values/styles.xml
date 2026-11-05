@@ -1,8 +1,10 @@
 <resources>
-    <style name="Theme.XatuHelper" parent="android:style/Theme.Material.Light.NoActionBar">
+    <style name="Base.Theme.XatuHelper" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#F9F9FF</item>
+        <item name="android:windowBackground">@color/app_background</item>
     </style>
+    <style name="Platform.Theme.XatuHelper" parent="Base.Theme.XatuHelper" />
+    <style name="Theme.XatuHelper" parent="Platform.Theme.XatuHelper" />
 </resources>

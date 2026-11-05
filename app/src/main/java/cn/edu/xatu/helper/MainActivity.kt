@@ -21,6 +21,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Compose owns both palettes. OEM automatic darkening can invert text independently
+        // of its container, especially on cached layers during page transitions.
+        if (android.os.Build.VERSION.SDK_INT >= 29) window.decorView.isForceDarkAllowed = false
         val model = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST") override fun <T : ViewModel> create(modelClass: Class<T>): T = HelperViewModel((application as HelperApplication).repository, (application as HelperApplication).campusRepository, updates = (application as HelperApplication).updates) { cn.edu.xatu.helper.platform.SystemCoordinator.synchronize(application) } as T
         })[HelperViewModel::class.java]

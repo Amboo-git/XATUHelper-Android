@@ -27,7 +27,7 @@ import cn.edu.xatu.helper.data.SchoolUrls
             actions = { TextButton(onClick = onComplete, enabled = landed && !loading) { Text("完成登录") } })
     }) { padding ->
         Column(Modifier.padding(padding).fillMaxSize()) {
-            Text("请使用学号 $account 登录；登录成功后点击右上角完成。", modifier = Modifier.padding(16.dp), style = MaterialTheme.typography.bodySmall)
+            Box(Modifier.padding(16.dp)) { InfoPanel("请使用学号 $account 登录；登录成功后点击右上角完成。") }
             LoadingProgress(loading)
             error?.let { message ->
                 Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))

@@ -95,7 +95,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             val previous = sorted.getOrNull(index - 1)?.date(anchor)
             if (bottom && (index == 0 || previous != null && previous >= today)) Text("已结束 / 待定", style = MaterialTheme.typography.titleMedium)
             else if (!bottom && (index == 0 || previous != date)) Text("$date · ${sorted.count { it.date(anchor) == date }} 场考试", style = MaterialTheme.typography.titleMedium)
-            OutlinedCard(Modifier.fillMaxWidth()) {
+            ContentCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     val date = exam.date(anchor)
                     if (date != null) Text(date.toString(), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
@@ -130,14 +130,17 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                 }
             }
         }
-        item { OutlinedTextField(search, { search = it }, singleLine = true, label = { Text("搜索课程或课程号") }, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().testTag("gradeSearch")) }
+        item { OutlinedTextField(search, { search = it }, singleLine = true, shape = MaterialTheme.shapes.large, label = { Text("搜索课程或课程号") }, leadingIcon = { Icon(Icons.Default.Search, null) }, modifier = Modifier.fillMaxWidth().testTag("gradeSearch")) }
         if (filtered.isEmpty()) item { EmptyMessage(if (page.grades.isEmpty()) "当前范围暂无成绩" else "没有匹配的课程", "可切换学期或调整搜索内容。") }
         items(filtered, key = { it.id }) { grade ->
             var expanded by rememberSaveable(scope, grade.id) { mutableStateOf(false) }
-            OutlinedCard(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+            ContentCard(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(grade.course, style = MaterialTheme.typography.titleMedium)
-                    Text("${grade.score.ifEmpty { "未公布" }} / ${grade.gpa.ifEmpty { "—" }}", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column { Text("成绩", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(grade.score.ifEmpty { "未公布" }, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold) }
+                        Column { Text("绩点", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant); Text(grade.gpa.ifEmpty { "—" }, style = MaterialTheme.typography.headlineSmall) }
+                    }
                     Text(listOf(grade.term, grade.code, grade.credit.takeIf { it.isNotBlank() }?.let { "$it 学分" }.orEmpty()).filter(String::isNotBlank).joinToString(" · "), style = MaterialTheme.typography.bodySmall)
                     if (grade.parts.isNotEmpty()) {
                         Text(if (expanded) "收起分项成绩" else "查看分项成绩", style = MaterialTheme.typography.labelLarge)
@@ -172,7 +175,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             }
         }
         if (warning != null) item { Text(warning, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
-        item { OutlinedTextField(query, { query = it }, label = { Text("搜索计划课程") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("planSearch")) }
+        item { OutlinedTextField(query, { query = it }, shape = MaterialTheme.shapes.large, label = { Text("搜索计划课程") }, leadingIcon = { Icon(Icons.Default.Search, null) }, singleLine = true, modifier = Modifier.fillMaxWidth().testTag("planSearch")) }
         item {
             Box {
                 OutlinedButton(onClick = { termMenu = true }) { Text(if (term.isBlank()) "全部开课学期" else "开课学期 $term"); Icon(Icons.Default.ArrowDropDown, null) }
@@ -193,10 +196,11 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
 
 @Composable private fun PlanModule(section: PlanSection, byCode: Map<String, CourseInfo>, byName: Map<String, CourseInfo>) {
     var expanded by rememberSaveable(section.id) { mutableStateOf(false) }
-    OutlinedCard(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
+    ContentCard(onClick = { expanded = !expanded }, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(section.title, style = MaterialTheme.typography.titleMedium)
-            Text("${number(section.earned)} / ${number(section.required)} 学分 · ${section.allCourses().size} 门课程")
+            Text("${number(section.earned)} / ${number(section.required)} 学分 · ${section.allCourses().size} 门课程", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            LinearProgressIndicator(progress = { if (section.required > 0) (section.earned / section.required).toFloat().coerceIn(0f, 1f) else 0f }, modifier = Modifier.fillMaxWidth().height(6.dp))
             Text(if (expanded) "收起模块" else "展开模块", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
         }
     }
@@ -206,7 +210,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
     } }
 }
 @Composable private fun PlanCourseCard(course: PlanCourse, info: CourseInfo?) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
+    ContentCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(course.name, style = MaterialTheme.typography.titleMedium)
             Text("${number(course.earned)} / ${number(course.required)} 学分 · ${if (course.passed) "已通过" else "未完成"}", color = if (course.passed) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
@@ -217,7 +221,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
     }
 }
 @Composable private fun EmptyMessage(title: String, detail: String) {
-    Column(Modifier.padding(vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(title, style = MaterialTheme.typography.titleMedium); Text(detail, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    EmptyState(title, detail, Icons.Default.School)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -227,52 +231,57 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     var copied by remember { mutableStateOf(false) }
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回校园") } }) }) { padding ->
-        LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            item { Text("账号", style = MaterialTheme.typography.titleMedium) }
-            item { OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(if (state.demo) "示例账号" else "学号 ${state.account}")
-                Text("登录凭据加密保存在本机，课表和教务数据可离线查看。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (!state.demo) OutlinedButton(onClick = onRelogin, enabled = !state.busy) { Text("重新登录") }
-            } } }
-            item { Text("课程表", style = MaterialTheme.typography.titleMedium) }
-            item { OutlinedButton(onClick = onCalibrate, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Default.EditCalendar, null); Spacer(Modifier.width(8.dp)); Text("校准第一周日期") } }
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text("显示周末", Modifier.weight(1f)); Switch(state.showWeekend, onWeekend, modifier = Modifier.testTag("weekendSetting"))
-            } }
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text("每日自动刷新电费余额", Modifier.weight(1f)); Switch(campus.autoElectric, onAutoElectric, enabled = !campus.busy)
-            } }
-            item { Text("提醒与桌面", style = MaterialTheme.typography.titleMedium) }
-            item { OutlinedButton(onClick = onReminders, modifier = Modifier.fillMaxWidth()) { Text("提醒设置") } }
-            item { OutlinedButton(onClick = onWidgets, modifier = Modifier.fillMaxWidth()) { Text("桌面小组件") } }
-            item { Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text("显示诊断数据", Modifier.weight(1f)); Switch(state.showDiagnostics, onDiagnostics, modifier = Modifier.testTag("diagnosticsSetting"))
-            } }
-            if (state.showDiagnostics) item {
-                Text(diagnosticSummary(state), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("diagnostics"))
-                TextButton(onClick = {
-                    (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
-                        .setPrimaryClip(android.content.ClipData.newPlainText("XATU Helper 诊断", diagnosticSummary(state)))
-                    copied = true
-                }) { Text(if (copied) "已复制诊断数据" else "复制诊断数据") }
-            }
-            item { Text("关于", style = MaterialTheme.typography.titleMedium) }
-            item { Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", fontWeight = FontWeight.Medium, modifier = Modifier.testTag("appVersion")) }
-            item { Text("西安工业大学校园助手 · 原生 Android", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            item { OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onCheckUpdates, enabled = !update.checking, modifier = Modifier.fillMaxWidth().testTag("checkUpdates")) {
-                    if (update.checking) { CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)) }
-                    Text(if (update.checking) "正在检查更新…" else "检查更新")
+        LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            item {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = MaterialTheme.shapes.extraLarge) {
+                    Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Icon(Icons.Default.AccountCircle, null, Modifier.size(36.dp))
+                        Text(if (state.demo) "示例账号" else "学号 ${state.account}", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text("登录凭据加密保存在本机，课表和教务数据可离线查看。", style = MaterialTheme.typography.bodySmall)
+                        if (!state.demo) FilledTonalButton(onClick = onRelogin, enabled = !state.busy) { Text("重新登录") }
+                    }
                 }
-                val checked = if (update.lastSuccess > 0) java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(update.lastSuccess)) else "尚未成功检查"
-                Text("上次成功检查：$checked", style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateLastSuccess"))
-                update.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateStatus")) }
-            } } }
-            item { OutlinedCard(onClick = { uriHandler.openUri("https://github.com/Kelejun/XATUHelper-Android") }, modifier = Modifier.fillMaxWidth().testTag("githubRepository")) {
-                ListItem(headlineContent = { Text("GitHub 仓库") }, supportingContent = { Text("Kelejun/XATUHelper-Android") }, leadingContent = { Icon(Icons.Default.Code, null) }, trailingContent = { Icon(Icons.Default.OpenInNew, "打开 GitHub 仓库") })
+            }
+            item { SectionHeading("课程表与校园") }
+            item { ServiceRow("校准第一周日期", "按当前教学周修正本地课表", Icons.Default.EditCalendar, onClick = onCalibrate) }
+            item { ToggleRow("显示周末", "在周视图中显示周六和周日", state.showWeekend, onWeekend, switchModifier = Modifier.testTag("weekendSetting")) }
+            item { ToggleRow("每日自动刷新电费余额", "根据已绑定宿舍更新本机记录", campus.autoElectric, onAutoElectric, enabled = !campus.busy) }
+            item { SectionHeading("提醒与桌面") }
+            item { ServiceRow("提醒设置", "上课、考试与系统通知权限", Icons.Default.Notifications, onClick = onReminders) }
+            item { ServiceRow("桌面小组件", "在桌面查看课程、电费和假期", Icons.Default.Widgets, onClick = onWidgets) }
+            item { SectionHeading("帮助与诊断") }
+            item { ToggleRow("显示诊断数据", "查看本机缓存状态与版本信息", state.showDiagnostics, onDiagnostics, switchModifier = Modifier.testTag("diagnosticsSetting")) }
+            if (state.showDiagnostics) item {
+                ContentCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(diagnosticSummary(state), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("diagnostics"))
+                        TextButton(onClick = {
+                            (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
+                                .setPrimaryClip(android.content.ClipData.newPlainText("XATU Helper 诊断", diagnosticSummary(state)))
+                            copied = true
+                        }) { Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(if (copied) "已复制诊断数据" else "复制诊断数据") }
+                    }
+                }
+            }
+            item { SectionHeading("关于") }
+            item { ContentCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    IconTile(Icons.Default.School, prominent = true)
+                    Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("appVersion"))
+                    Text("西安工业大学校园助手 · 原生 Android", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    FilledTonalButton(onClick = onCheckUpdates, enabled = !update.checking, modifier = Modifier.fillMaxWidth().testTag("checkUpdates")) {
+                        if (update.checking) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Default.SystemUpdate, null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp)); Text(if (update.checking) "正在检查更新…" else "检查更新")
+                    }
+                    val checked = if (update.lastSuccess > 0) java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.CHINA).format(java.util.Date(update.lastSuccess)) else "尚未成功检查"
+                    Text("上次成功检查：$checked", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("updateLastSuccess"))
+                    update.message?.let { Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("updateStatus")) }
+                }
             } }
-            item { Spacer(Modifier.height(16.dp)); OutlinedButton(onClick = { confirmLogout = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().testTag("logout"), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("退出登录") } }
+            item { ServiceRow("GitHub 仓库", "Kelejun/XATUHelper-Android", Icons.Default.Code, Modifier.testTag("githubRepository")) { uriHandler.openUri("https://github.com/Kelejun/XATUHelper-Android") } }
+            item { Spacer(Modifier.height(12.dp)); OutlinedButton(onClick = { confirmLogout = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("logout"), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("退出登录") } }
         }
     }
-    if (confirmLogout) AlertDialog(onDismissRequest = { confirmLogout = false }, title = { Text("退出登录？") }, text = { Text("将清除此设备上的账号、登录状态、课表和教务缓存。") }, confirmButton = { TextButton(onClick = { confirmLogout = false; onLogout() }) { Text("确认退出") } }, dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("取消") } })
+    if (confirmLogout) AlertDialog(onDismissRequest = { confirmLogout = false }, icon = { Icon(Icons.Default.Logout, null) }, title = { Text("退出登录？") }, text = { Text("将清除此设备上的账号、登录状态、课表和教务缓存。") }, confirmButton = { TextButton(onClick = { confirmLogout = false; onLogout() }) { Text("确认退出") } }, dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("取消") } })
 }

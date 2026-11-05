@@ -1,0 +1,5 @@
+<resources>
+    <style name="Platform.Theme.XatuHelper" parent="Base.Theme.XatuHelper">
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
+</resources>

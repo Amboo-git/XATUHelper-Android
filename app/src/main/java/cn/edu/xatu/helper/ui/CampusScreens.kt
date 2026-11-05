@@ -72,9 +72,9 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
             item {
                 Card(colors = CardDefaults.cardColors(containerColor = if (state.electric?.balance?.toBigDecimalOrNull()?.let { it < 10.toBigDecimal() } == true) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer), modifier = Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("剩余电量", style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Default.Bolt, null, Modifier.size(20.dp)); Text("剩余电量", style = MaterialTheme.typography.labelLarge) }
                         AnimatedContent(state.electric?.let { "${it.balance} 度" } ?: "—", label = "electricBalance") { balance ->
-                            Text(balance, style = MaterialTheme.typography.displaySmall, modifier = Modifier.testTag("electricBalance"))
+                            Text(balance, style = MaterialTheme.typography.displaySmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, modifier = Modifier.testTag("electricBalance"))
                         }
                         Text(state.dorm?.label ?: "还未选择宿舍")
                         state.electric?.let { Text("更新于 ${moneyTime(it.checkedAt)}", style = MaterialTheme.typography.bodySmall) }
@@ -95,7 +95,7 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
                 item { Row { Button(onClick = { focusManager.clearFocus(); controller.bindDorm() }, enabled = !state.busy && state.room != null) { Text("保存并查询") }; TextButton(onClick = { focusManager.clearFocus(); controller.closeSelector() }, enabled = !state.busy) { Text("取消") } } }
             }
             if (state.dorm != null) {
-                item { Row(verticalAlignment = Alignment.CenterVertically) { Text("每日自动更新余额", Modifier.weight(1f)); Switch(state.autoElectric, controller::autoElectric, enabled = !state.busy) } }
+                item { ToggleRow("每日自动更新余额", "将每日查询结果保存为用电记录", state.autoElectric, controller::autoElectric, enabled = !state.busy) }
                 item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(usageChart, { usageChart = true }, label = { Text("近七天用电") })
                     FilterChip(!usageChart, { usageChart = false }, label = { Text("余额趋势") })
@@ -136,7 +136,7 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
 @Composable private fun BalanceChart(records: List<DailyBalance>, usage: Boolean) {
     val points = records.mapNotNull { r -> r.balance.toFloatOrNull()?.let { r.day to it } }
     val color = MaterialTheme.colorScheme.primary
-    if (points.isEmpty()) { Text("累计查询两天后显示趋势", Modifier.padding(20.dp), color = MaterialTheme.colorScheme.onSurfaceVariant); return }
+    if (points.isEmpty()) { InfoPanel("累计查询两天后显示趋势"); return }
     Text(points.joinToString("；") { "${it.first.takeLast(5)} ${it.second} 度" }, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Canvas(Modifier.fillMaxWidth().height(120.dp).padding(12.dp).semantics { contentDescription = if (usage) "每日用电估算图" else "每日余额趋势图" }) {
         val min = points.minOf { it.second }; val max = points.maxOf { it.second }; val range = (max - min).coerceAtLeast(1f)
@@ -165,10 +165,16 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
             val calendar = state.calendar
             if (calendar == null) item { Text(if (state.busy) "正在获取官方校历…" else "连接校园网后获取校历；已保存的校历可离线查看。") }
             else {
-                item { Text(calendar.title, style = MaterialTheme.typography.headlineSmall); Text("识别于 ${moneyTime(calendar.fetchedAt)}", style = MaterialTheme.typography.labelSmall) }
-                item { Text("日期由本机识别，仅供参考，请以官方原图为准。", style = MaterialTheme.typography.bodySmall) }
+                item { Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
+                    Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Default.EventAvailable, null, Modifier.size(28.dp))
+                        Text(calendar.title, style = MaterialTheme.typography.headlineSmall)
+                        Text("识别于 ${moneyTime(calendar.fetchedAt)}", style = MaterialTheme.typography.labelSmall)
+                    }
+                } }
+                item { InfoPanel("日期由本机识别，仅供参考，请以官方原图为准。") }
                 if (calendar.imagePath.isNotBlank()) item { Button(onClick = { image = true }) { Text("查看校历原图") } }
-                items(calendar.semesters, key = { it.start }) { span -> OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(span.label, style = MaterialTheme.typography.titleMedium); Text("${span.start} — ${span.end}") } } }
+                items(calendar.semesters, key = { it.start }) { span -> ContentCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(span.label, style = MaterialTheme.typography.titleMedium); Text("${span.start} — ${span.end}") } } }
                 items(schoolBreaks(calendar), key = { "break:${it.start}" }) { holiday -> Card(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(holiday.title, style = MaterialTheme.typography.titleLarge)
                     Text("${holiday.start} — ${holiday.end?.toString() ?: "结束日期待识别"}")
@@ -217,21 +223,23 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
     val options = state.reminders
     CampusFrame("提醒设置", state, onBack) {
         LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.testTag("reminders")) {
-            item { Text("使用当前学期的学生课表与考试缓存，滚动安排未来七天；更新数据后自动重排。", style = MaterialTheme.typography.bodyMedium) }
-            item { Row(verticalAlignment = Alignment.CenterVertically) { Text("上课提醒", Modifier.weight(1f)); Switch(options.classes, { update(options.copy(classes = it)) }, enabled = !state.busy) } }
+            item { InfoPanel("使用当前学期的学生课表与考试缓存，滚动安排未来七天；更新数据后自动重排。", Icons.Default.Notifications) }
+            item { SectionHeading("课程提醒") }
+            item { ToggleRow("上课提醒", "按课表安排课前通知", options.classes, { update(options.copy(classes = it)) }, enabled = !state.busy) }
             item { Box { OutlinedButton(onClick = { leadMenu = "class" }) { Text("上课前 ${options.classLead} 分钟") }; DropdownMenu(leadMenu == "class", { leadMenu = null }) { listOf(5,10,15,20,30,45,60).forEach { minutes -> DropdownMenuItem(text = { Text("$minutes 分钟") }, onClick = { leadMenu = null; update(options.copy(classLead = minutes)) }) } } } }
             item { HorizontalDivider() }
-            item { Row(verticalAlignment = Alignment.CenterVertically) { Text("考试提醒", Modifier.weight(1f)); Switch(options.exams, { update(options.copy(exams = it)) }, enabled = !state.busy) } }
-            item { Row(verticalAlignment = Alignment.CenterVertically) { Text("前一天提醒", Modifier.weight(1f)); Switch(options.eve, { update(options.copy(eve = it)) }, enabled = !state.busy && options.exams) }; TextButton(onClick = { editingTime = "eve" }, enabled = options.exams) { Text("前一天 ${"%02d:%02d".format(options.eveMinutes / 60, options.eveMinutes % 60)}") } }
-            item { Row(verticalAlignment = Alignment.CenterVertically) { Text("当天早间提醒", Modifier.weight(1f)); Switch(options.morning, { update(options.copy(morning = it)) }, enabled = !state.busy && options.exams) }; TextButton(onClick = { editingTime = "morning" }, enabled = options.exams) { Text("当天 ${"%02d:%02d".format(options.morningMinutes / 60, options.morningMinutes % 60)}") } }
-            item { Row(verticalAlignment = Alignment.CenterVertically) { Text("开考前提醒", Modifier.weight(1f)); Switch(options.before, { update(options.copy(before = it)) }, enabled = !state.busy && options.exams) }; Box { OutlinedButton(onClick = { leadMenu = "exam" }) { Text("开考前 ${options.examLead} 分钟") }; DropdownMenu(leadMenu == "exam", { leadMenu = null }) { listOf(10,15,20,30,45,60).forEach { minutes -> DropdownMenuItem(text = { Text("$minutes 分钟") }, onClick = { leadMenu = null; update(options.copy(examLead = minutes)) }) } } } }
+            item { SectionHeading("考试安排") }
+            item { ToggleRow("考试提醒", "根据当前学期的考试安排发送通知", options.exams, { update(options.copy(exams = it)) }, enabled = !state.busy) }
+            item { ToggleRow("前一天提醒", "考前一天提前做好准备", options.eve, { update(options.copy(eve = it)) }, enabled = !state.busy && options.exams); TextButton(onClick = { editingTime = "eve" }, enabled = options.exams) { Text("前一天 ${"%02d:%02d".format(options.eveMinutes / 60, options.eveMinutes % 60)}") } }
+            item { ToggleRow("当天早间提醒", "考试当天早间发送通知", options.morning, { update(options.copy(morning = it)) }, enabled = !state.busy && options.exams); TextButton(onClick = { editingTime = "morning" }, enabled = options.exams) { Text("当天 ${"%02d:%02d".format(options.morningMinutes / 60, options.morningMinutes % 60)}") } }
+            item { ToggleRow("开考前提醒", "按设定的提前时间再次提醒", options.before, { update(options.copy(before = it)) }, enabled = !state.busy && options.exams); Box { OutlinedButton(onClick = { leadMenu = "exam" }) { Text("开考前 ${options.examLead} 分钟") }; DropdownMenu(leadMenu == "exam", { leadMenu = null }) { listOf(10,15,20,30,45,60).forEach { minutes -> DropdownMenuItem(text = { Text("$minutes 分钟") }, onClick = { leadMenu = null; update(options.copy(examLead = minutes)) }) } } } }
             item { HorizontalDivider() }
             item {
-                Text(if (notificationsAllowed) "系统通知已允许" else "系统通知未允许，请在系统设置中开启。")
+                InfoPanel(if (notificationsAllowed) "系统通知已允许" else "系统通知未允许，请在系统设置中开启。", if (notificationsAllowed) Icons.Default.CheckCircle else Icons.Default.NotificationsOff)
                 OutlinedButton(onClick = { context.startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)) }) { Text("系统通知设置") }
             }
             item {
-                Text(if (exactAllowed) "准时提醒权限已允许" else "未允许准时提醒，系统可能延后通知。")
+                InfoPanel(if (exactAllowed) "准时提醒权限已允许" else "未允许准时提醒，系统可能延后通知。", Icons.Default.Schedule)
                 if (Build.VERSION.SDK_INT >= 31 && !exactAllowed) OutlinedButton(onClick = { context.startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}"))) }) { Text("开启准时提醒") }
             }
             item { Text("已安排 ${context.getSharedPreferences("system_schedule", android.content.Context.MODE_PRIVATE).getInt("count", 0)} 条提醒。若没有提醒，请先同步当前学期的学生课表和考试安排。", style = MaterialTheme.typography.bodySmall) }
@@ -260,14 +268,32 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
         if (!WidgetPinning.openPermissionSettings(context)) message = "无法打开设置，请手动进入系统设置 → 应用 → XATU Helper → 权限。"
     }
     CampusFrame("桌面小组件", state, onBack) {
-        Column(Modifier.padding(24.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("课程、电费和假期数据来自本机缓存。小组件点击可进入对应页面，课程支持上完后查看明天，电费支持刷新。Android 12 及以上跟随系统壁纸配色和深浅模式。")
-            Text(WidgetPinning.PERMISSION_HELP)
-            OutlinedButton(onClick = { openPermissions() }, modifier = Modifier.fillMaxWidth()) { Text("桌面添加权限设置") }
-            listOf("课程" to CourseWidget::class.java, "宿舍电费" to ElectricityWidget::class.java, "假期倒计时" to HolidayWidget::class.java).forEach { (label, cls) ->
-                OutlinedButton(onClick = { pending = cls }, modifier = Modifier.fillMaxWidth()) { Text("添加$label") }
+        Column(Modifier.padding(horizontal = 20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SectionHeading("校园信息，就在桌面", "课程、电费和假期数据来自本机缓存")
+            InfoPanel("Android 12 及以上跟随系统壁纸配色和深浅模式。点击小组件可进入对应页面。", Icons.Default.Palette)
+            ContentCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("添加前，检查桌面权限", style = MaterialTheme.typography.titleMedium)
+                    Text(WidgetPinning.PERMISSION_HELP, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    FilledTonalButton(onClick = { openPermissions() }) { Icon(Icons.Default.Security, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("桌面添加权限设置") }
+                }
             }
-            message?.let { Text(it) }
+            listOf(Triple("课程", "今天的课程安排，上完后可切换到明天", CourseWidget::class.java), Triple("宿舍电费", "剩余电量一眼可见，支持手动刷新", ElectricityWidget::class.java), Triple("假期倒计时", "查看距离下一个校园假期还有几天", HolidayWidget::class.java)).forEach { (label, detail, cls) ->
+                ContentCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            IconTile(when (label) { "课程" -> Icons.Default.CalendarMonth; "宿舍电费" -> Icons.Default.Bolt; else -> Icons.Default.EventAvailable }, prominent = true)
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(label, style = MaterialTheme.typography.titleMedium)
+                                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        FilledTonalButton(onClick = { pending = cls }, modifier = Modifier.align(Alignment.End)) { Icon(Icons.Default.Add, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("添加$label") }
+                    }
+                }
+            }
+            message?.let { InfoPanel(it) }
+            Spacer(Modifier.height(12.dp))
         }
     }
     pending?.let { provider ->
