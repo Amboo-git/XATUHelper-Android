@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Keep the cap inside the adaptive icon safe zone for every launcher mask. -->
+    <group android:scaleX="0.8" android:scaleY="0.8"
+        android:pivotX="54" android:pivotY="54">
+        <path android:fillColor="#FFFFFF"
+            android:pathData="M20,40L54,24L88,40L54,56zM30,51L30,70Q54,86 78,70L78,51L54,63z" />
+    </group>
+</vector>
