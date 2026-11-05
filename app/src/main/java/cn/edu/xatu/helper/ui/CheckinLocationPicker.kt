@@ -8,6 +8,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MyLocation
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import kotlinx.coroutines.launch
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,7 +37,7 @@ import java.util.Locale
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable internal fun CheckinLocationPicker(onBack: () -> Unit) {
+@Composable internal fun CheckinLocationPicker(locationSource: CurrentLocationSource? = null, onBack: () -> Unit) {
     val context = LocalContext.current
     val preferences = remember(context) { CheckinLocationPreferences(context) }
     val original = remember { preferences.read().coordinate ?: CheckinCoordinate(34.383, 108.981) }
@@ -47,9 +51,38 @@ import java.util.Locale
         kotlinx.coroutines.delay(350)
         selected?.gps()?.let { mapCenter = it }
     }
+    val source = locationSource ?: remember(context) { AndroidCurrentLocationSource(context) }
+    val scope = rememberCoroutineScope()
+    var locating by remember { mutableStateOf(false) }
+    var locationMessage by remember { mutableStateOf<String?>(null) }
+    var locationError by remember { mutableStateOf(false) }
+    fun useCurrentLocation() {
+        if (locating) return
+        scope.launch {
+            locating = true
+            locationMessage = null
+            locationError = false
+            try {
+                val result = source.locate()
+                val point = result.coordinate.gps()
+                if (!point.isValid) throw LocationRequestException("定位结果无效，请重试。")
+                latitude = "%.6f".format(Locale.ROOT, point.latitude)
+                longitude = "%.6f".format(Locale.ROOT, point.longitude)
+                system = CoordinateSystem.WGS84
+                mapCenter = point
+                locationMessage = "已填入当前位置${result.accuracyMeters?.let { " · 定位精度约 ${kotlin.math.ceil(it.toDouble()).toInt()} 米" }.orEmpty()}，请确认后保存。"
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { locationError = true; locationMessage = (error as? LocationRequestException)?.message ?: "暂时无法定位，请检查系统定位和权限后重试。" }
+            finally { locating = false }
+        }
+    }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants.values.any { it } || source.hasPermission) useCurrentLocation()
+        else { locationError = true; locationMessage = "未获得定位权限，请在系统的应用权限中允许定位后重试。" }
+    }
     val back = Modifier.predictiveBack(onBack = onBack)
     Scaffold(modifier = back, topBar = { TopAppBar(title = { Text("选择签到位置") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回设置") } }, actions = {
-        TextButton(onClick = { selected?.let { preferences.save(it); onBack() } }, enabled = selected != null, modifier = Modifier.testTag("saveCheckinLocation")) { Icon(Icons.Default.Check, null); Text("保存") }
+        TextButton(onClick = { selected?.let { preferences.save(it); onBack() } }, enabled = selected != null && !locating, modifier = Modifier.testTag("saveCheckinLocation")) { Icon(Icons.Default.Check, null); Text("保存") }
     }) }) { padding ->
         Column(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             CoordinateMap(mapCenter) { point ->
@@ -59,6 +92,15 @@ import java.util.Locale
                 system = CoordinateSystem.WGS84
             }
             Text("移动地图，将十字中心对准要传入的位置；也可以直接输入经纬度。", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FilledTonalButton(onClick = {
+                if (source.hasPermission) useCurrentLocation()
+                else permission.launch(arrayOf(android.Manifest.permission.ACCESS_COARSE_LOCATION, android.Manifest.permission.ACCESS_FINE_LOCATION))
+            }, enabled = !locating, modifier = Modifier.fillMaxWidth().testTag("useCurrentLocation")) {
+                if (locating) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Icon(Icons.Default.MyLocation, null, Modifier.size(20.dp))
+                Spacer(Modifier.width(8.dp)); Text(if (locating) "正在获取当前位置…" else "使用当前位置")
+            }
+            locationMessage?.let { InfoPanel(it) }
+            if (locationError) TextButton(onClick = { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }) { Text("系统定位设置") }
             SectionHeading("坐标")
             Box {
                 FilledTonalButton(onClick = { systemMenu = true }, modifier = Modifier.fillMaxWidth().testTag("coordinateSystem")) { Text(system.title) }

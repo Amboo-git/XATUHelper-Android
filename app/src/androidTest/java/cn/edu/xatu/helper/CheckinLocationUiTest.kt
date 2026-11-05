@@ -80,6 +80,68 @@ class CheckinLocationUiTest {
         assertEquals(saved, preferences.read().coordinate)
     }
 
+    @Test fun currentLocationFillsGpsCoordinatesAndSavesOnlyAfterConfirmation() {
+        val expected = CheckinCoordinate(34.385123, 108.975456, CoordinateSystem.WGS84)
+        var calls = 0
+        var finished = false
+        val source = object : CurrentLocationSource {
+            override val hasPermission = true
+            override suspend fun locate(): LocatedPoint { calls++; return LocatedPoint(expected, 8f) }
+        }
+        compose.runOnUiThread { compose.activity.setContent {
+            CompositionLocalProvider(LocalMapNetworkEnabled provides false) { HelperTheme { CheckinLocationPicker(source) { finished = true } } }
+        } }
+        compose.onNodeWithTag("useCurrentLocation").performScrollTo().performClick()
+        compose.waitUntil(5000) { calls == 1 }
+        compose.onNodeWithTag("checkinLatitude").performScrollTo().assertTextContains("34.385123", substring = true)
+        compose.onNodeWithTag("checkinLongitude").performScrollTo().assertTextContains("108.975456", substring = true)
+        compose.onNodeWithTag("coordinateSystem").performScrollTo().assertTextEquals("GPS（WGS84）")
+        assertNull("Fetching location must not silently save or enable testing", preferences.read().coordinate)
+        assertFalse(preferences.read().enabled)
+        shot("location-current-filled.png")
+        compose.onNodeWithTag("saveCheckinLocation").performClick()
+        assertTrue(finished)
+        assertEquals(expected, preferences.read().coordinate)
+        assertFalse(preferences.read().enabled)
+    }
+
+    @Test fun failedLocationKeepsEnteredCoordinatesAndOffersRetry() {
+        val source = object : CurrentLocationSource {
+            override val hasPermission = true
+            override suspend fun locate(): LocatedPoint = throw LocationRequestException("系统定位未开启，请在系统设置中开启定位。")
+        }
+        compose.runOnUiThread { compose.activity.setContent {
+            CompositionLocalProvider(LocalMapNetworkEnabled provides false) { HelperTheme { CheckinLocationPicker(source) {} } }
+        } }
+        compose.onNodeWithTag("useCurrentLocation").performScrollTo().performClick()
+        compose.onNodeWithText("系统定位未开启，请在系统设置中开启定位。").assertIsDisplayed()
+        compose.onNodeWithTag("useCurrentLocation").assertIsEnabled()
+        compose.onNodeWithTag("checkinLatitude").performScrollTo().assertTextContains("34.383000", substring = true)
+        assertNull(preferences.read().coordinate)
+    }
+
+    @Test fun leavingPickerCancelsPendingCurrentLocationRequest() {
+        var displayed by mutableStateOf(true)
+        var started = false
+        var cancelled = false
+        val source = object : CurrentLocationSource {
+            override val hasPermission = true
+            override suspend fun locate(): LocatedPoint {
+                started = true
+                try { kotlinx.coroutines.awaitCancellation() } finally { cancelled = true }
+            }
+        }
+        compose.runOnUiThread { compose.activity.setContent {
+            CompositionLocalProvider(LocalMapNetworkEnabled provides false) { HelperTheme { if (displayed) CheckinLocationPicker(source) {} } }
+        } }
+        compose.onNodeWithTag("useCurrentLocation").performScrollTo().performClick()
+        compose.waitUntil(5000) { started }
+        compose.onNodeWithTag("saveCheckinLocation").assertIsNotEnabled()
+        compose.runOnIdle { displayed = false }
+        compose.waitUntil(5000) { cancelled }
+        assertNull(preferences.read().coordinate)
+    }
+
     @Test fun realWebViewRepliesToEachFrameAndRechecksLocationSource() {
         Assume.assumeTrue(WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER))
         preferences.save(CheckinCoordinate(34.38, 108.97, CoordinateSystem.WGS84)); preferences.enable(true)
