@@ -4,7 +4,7 @@ import cn.edu.xatu.helper.model.*
 import java.time.LocalDate
 
 fun parentPage(page: String?): String? = when (page) {
-    "notifications", "widgets" -> "settings"
+    "notifications", "widgets", "checkinLocation" -> "settings"
     "charge" -> "electricity"
     "planWeb" -> "plan"
     else -> null

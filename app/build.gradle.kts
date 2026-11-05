@@ -20,8 +20,8 @@ android {
         applicationId = "cn.edu.xatu.helper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.1.5"
+        versionCode = 18
+        versionName = "1.1.4"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"

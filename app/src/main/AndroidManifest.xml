@@ -6,7 +6,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="com.android.launcher.permission.INSTALL_SHORTCUT" />
-    <application android:name=".HelperApplication" android:label="XATU Helper"
+    <application android:name=".HelperApplication" android:label="@string/app_name"
         android:icon="@drawable/ic_launcher" android:roundIcon="@drawable/ic_launcher" android:allowBackup="false" android:fullBackupContent="false" android:dataExtractionRules="@xml/data_extraction_rules"
         android:enableOnBackInvokedCallback="true" android:supportsRtl="true" android:theme="@style/Theme.XatuHelper"
         android:networkSecurityConfig="@xml/network_security_config">

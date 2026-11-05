@@ -46,6 +46,8 @@ object CampusLinks {
     val (title, url) = CampusLinks.pages.getValue(page)
     val context = LocalContext.current
     var web by remember { mutableStateOf<WebView?>(null) }
+    var locationBridge by remember { mutableStateOf<cn.edu.xatu.helper.platform.CheckinLocationBridge?>(null) }
+    val checkinLocation by rememberCheckinLocationSettings()
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var navigation by remember { mutableIntStateOf(0) }
@@ -60,28 +62,41 @@ object CampusLinks {
     var files by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris -> files?.onReceiveValue(uris.takeIf { it.isNotEmpty() }?.toTypedArray()); files = null }
     val permissions = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { granted ->
-        pendingLocation?.let { (origin, callback) -> callback.invoke(origin, granted.values.any { it }, false) }; pendingLocation = null
+        pendingLocation?.let { (origin, callback) ->
+            val allowed = granted.values.any { it } && !cn.edu.xatu.helper.platform.CheckinLocationPreferences(context).read().enabled && CampusLinks.mayLocate(page, origin, web?.url.orEmpty())
+            callback.invoke(origin, allowed, false)
+        }; pendingLocation = null
     }
     val backModifier = Modifier.predictiveBack { if (web?.canGoBack() == true) web?.goBack() else onClose() }
     DisposableEffect(Unit) { onDispose {
         pendingLocation?.let { it.second.invoke(it.first, false, false) }; files?.onReceiveValue(null)
+        locationBridge?.close(); locationBridge = null
         web?.apply { stopLoading(); webChromeClient = null; webViewClient = WebViewClient(); removeAllViews(); destroy() }; web = null
     } }
     Scaffold(modifier = backModifier, topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭网页") } }, actions = { IconButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(web?.url ?: url))) }.onFailure { error = "没有可打开网页的浏览器" } }) { Icon(Icons.Default.OpenInNew, "在浏览器中打开") }; IconButton(onClick = { error = null; web?.reload() }) { Icon(Icons.Default.Refresh, "重新加载网页") } }) }) { padding ->
         Column(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize()) {
             LoadingProgress(loading)
-            if (page == "checkin") Box(Modifier.padding(12.dp)) { InfoPanel("定位仅用于当前学校签到网页，需你授权后提供。") }
+            if (page == "checkin") Box(Modifier.padding(12.dp)) {
+                InfoPanel(if (checkinLocation.enabled) {
+                    if (locationBridge?.supportsDocumentStart == true) "签到测试已开启，当前网页使用设置中选择的坐标。"
+                    else "当前系统 WebView 版本不支持签到测试，请更新 Android System WebView 后重试；本次不会提供实际定位。"
+                } else "定位仅用于当前学校签到网页，需你授权后提供。")
+            }
             error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
             AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { ctx -> WebView(ctx).apply {
                 web = this
+                if (page == "checkin") locationBridge = cn.edu.xatu.helper.platform.CheckinLocationBridge(this).also { it.attach() }
                 settings.javaScriptEnabled = true; settings.domStorageEnabled = true
                 settings.allowFileAccess = false; settings.allowContentAccess = true
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 settings.setGeolocationEnabled(page == "checkin")
                 webChromeClient = object : WebChromeClient() {
                     override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
-                        val source = Uri.parse(origin)
-                        val top = Uri.parse(web?.url.orEmpty())
+                        if (page == "checkin" && cn.edu.xatu.helper.platform.CheckinLocationPreferences(context).read().enabled) {
+                            callback.invoke(origin, false, false)
+                            if (locationBridge?.supportsDocumentStart != true) error = "请更新 Android System WebView 后使用签到测试。"
+                            return
+                        }
                         if (!CampusLinks.mayLocate(page, origin, web?.url.orEmpty())) { callback.invoke(origin, false, false); return }
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) callback.invoke(origin, true, false)
                         else { pendingLocation?.let { it.second.invoke(it.first, false, false) }; pendingLocation = origin to callback; permissions.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION)) }

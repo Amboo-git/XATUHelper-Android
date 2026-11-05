@@ -1,6 +1,7 @@
 package cn.edu.xatu.helper.ui
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
@@ -225,11 +226,14 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Composable fun SettingsScreen(state: UiState, onBack: () -> Unit, onCalibrate: () -> Unit, onRelogin: () -> Unit, onLogout: () -> Unit, onReminders: () -> Unit = {}, onWidgets: () -> Unit = {}, onWeekend: (Boolean) -> Unit = {}, onDiagnostics: (Boolean) -> Unit = {}, campus: CampusState = CampusState(), onAutoElectric: (Boolean) -> Unit = {}, update: UpdateUi = UpdateUi(), onCheckUpdates: () -> Unit = {}) {
+@Composable fun SettingsScreen(state: UiState, onBack: () -> Unit, onCalibrate: () -> Unit, onRelogin: () -> Unit, onLogout: () -> Unit, onReminders: () -> Unit = {}, onWidgets: () -> Unit = {}, onWeekend: (Boolean) -> Unit = {}, onDiagnostics: (Boolean) -> Unit = {}, campus: CampusState = CampusState(), onAutoElectric: (Boolean) -> Unit = {}, update: UpdateUi = UpdateUi(), onCheckUpdates: () -> Unit = {}, onCheckinLocation: () -> Unit = {}) {
     var confirmLogout by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     var copied by remember { mutableStateOf(false) }
+    val location by rememberCheckinLocationSettings()
+    val locationPreferences = remember(context) { cn.edu.xatu.helper.platform.CheckinLocationPreferences(context) }
+    var versionTaps by remember { mutableIntStateOf(0) }
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }, navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回校园") } }) }) { padding ->
         LazyColumn(Modifier.padding(padding).fillMaxSize().testTag("settings"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             item {
@@ -263,11 +267,20 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                     }
                 }
             }
+            if (location.revealed) {
+                item { SectionHeading("签到测试") }
+                item { ToggleRow("传入定位", "开启后，签到网页使用所选坐标；关闭后恢复实际定位", location.enabled, locationPreferences::enable, enabled = location.coordinate != null || location.enabled, switchModifier = Modifier.testTag("checkinLocationEnabled")) }
+                item { ServiceRow("选择位置", location.coordinate?.let { "%.6f, %.6f".format(java.util.Locale.ROOT, it.latitude, it.longitude) } ?: "未选择", Icons.Default.LocationOn, Modifier.testTag("checkinLocationPicker"), onClick = onCheckinLocation) }
+                item { InfoPanel("先选择位置，再开启传入定位。所选坐标保存在本机，仅用于签到网页。") }
+            }
             item { SectionHeading("关于") }
             item { ContentCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     IconTile(Icons.Default.School, prominent = true)
-                    Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("appVersion"))
+                    Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("appVersion").clickable {
+                        versionTaps++
+                        if (versionTaps >= 5) { locationPreferences.reveal(); versionTaps = 0 }
+                    })
                     Text("西安工业大学校园助手 · 原生 Android", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     FilledTonalButton(onClick = onCheckUpdates, enabled = !update.checking, modifier = Modifier.fillMaxWidth().testTag("checkUpdates")) {

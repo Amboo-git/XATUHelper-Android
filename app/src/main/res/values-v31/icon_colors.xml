@@ -1,0 +1,4 @@
+<resources>
+    <!-- Normal adaptive icons also follow the wallpaper on Android 12+. -->
+    <color name="ic_launcher_background">@android:color/system_accent1_600</color>
+</resources>

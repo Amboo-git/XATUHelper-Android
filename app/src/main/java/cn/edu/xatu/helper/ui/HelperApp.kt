@@ -142,10 +142,11 @@ import java.time.format.DateTimeFormatter
     val direction = remember(page) { if (page == null || parentPage(previousPage) == page) -1 else 1 }
     SideEffect { previousPage = page }
     ScreenTransition(page, modifier = backModifier, direction = direction) { destination -> when (destination) {
-        "settings" -> SettingsScreen(state, { page = null }, { showCalibration = true }, onRelogin, model::logout, { page = "notifications" }, { page = "widgets" }, model::showWeekend, model::showDiagnostics, campusState, { model.campus?.autoElectric(it) }, update, { model.checkUpdates(manual = true) })
+        "settings" -> SettingsScreen(state, { page = null }, { showCalibration = true }, onRelogin, model::logout, { page = "notifications" }, { page = "widgets" }, model::showWeekend, model::showDiagnostics, campusState, { model.campus?.autoElectric(it) }, update, { model.checkUpdates(manual = true) }, onCheckinLocation = { page = "checkinLocation" })
         "electricity" -> model.campus?.let { ElectricityScreen(it, { page = null }, { page = "charge" }) }
         "calendar" -> model.campus?.let { CalendarScreen(it, { page = null }) }
         "notifications" -> model.campus?.let { ReminderScreen(it, { page = "settings" }) }
+        "checkinLocation" -> CheckinLocationPicker { page = "settings" }
         "widgets" -> WidgetSettings({ page = "settings" }, campusState)
         in CampusLinks.pages.keys -> CampusWeb(destination!!, { model.browserClosed(); page = parentPage(destination) })
         "exams", "grades", "plan" -> AcademicScreen(when (destination) { "exams" -> AcademicKind.EXAMS; "grades" -> AcademicKind.GRADES; else -> AcademicKind.PLAN }, state, model, { page = null }, onRelogin, { page = if (destination == "plan") "planWeb" else "eams" }, initialScope = academicScope)
@@ -249,83 +250,126 @@ import java.time.format.DateTimeFormatter
     val table = state.table
     val week = table?.let { weekOf(LocalDate.parse(it.monday), now.toLocalDate()) } ?: state.week
     val current = state.selectedSemester == state.currentSemester
-    val courses = remember(table, current, now.toLocalDate()) { if (current) coursesOn(table, now.toLocalDate()) else emptyList() }
-    val showingTomorrow = current && courses.none { java.time.LocalTime.parse(Periods.range(it).substringAfter("–")) > now.toLocalTime() }
-    val tomorrow = if (showingTomorrow) coursesOn(table, now.toLocalDate().plusDays(1)) else emptyList()
-    LazyColumn(Modifier.fillMaxSize().testTag("home"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val schedule = homeSchedule(table, current, now.toLocalDate(), now.toLocalTime())
+    val nextExam = state.academic[academicKey(AcademicKind.EXAMS, state.currentSemester)]?.data?.exams
+        ?.filter { it.date(examAnchor(state))?.let { day -> day >= now.toLocalDate() } == true }
+        ?.sortedWith(compareBy({ it.date(examAnchor(state)) }, { it.time }))?.firstOrNull()
+    val examDays = nextExam?.date(examAnchor(state))?.let { java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), it) }
+    val status = buildList {
+        if (current && week > 0) add("第 $week 周")
+        add(if (schedule.remaining == 0) "今天没课了" else "今天还有 ${schedule.remaining} 节课")
+        examDays?.let { add(if (it == 0L) "今天有考试" else "下次考试还有 $it 天") }
+    }.joinToString(" · ")
+    val holiday = nextCampusEvent(campus.calendar, now.toLocalDate())
+    LazyColumn(Modifier.fillMaxSize().testTag("home"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(now.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.CHINA)), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Text("今天的安排", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                Text("第 $week 周 · ${table?.semester?.name.orEmpty()}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(now.format(DateTimeFormatter.ofPattern("M月d日 EEEE", java.util.Locale.CHINA)), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(campusGreeting(now.toLocalTime()), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("homeGreeting"))
+                Text(status, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         item {
-            Card(onClick = onTable, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer), shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("今日课表", style = MaterialTheme.typography.labelLarge)
-                        Text(if (courses.isEmpty()) "今天没有课程" else "今天 ${courses.size} 门课", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                        Text("查看完整课程表", style = MaterialTheme.typography.bodyMedium)
+            ContentCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Top) {
+                        Text(schedule.title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text("周${"一二三四五六日"[schedule.date.dayOfWeek.value - 1]}", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Icon(Icons.Default.CalendarMonth, null, Modifier.size(44.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    if (schedule.courses.isEmpty()) Column(Modifier.fillMaxWidth().padding(vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        IconTile(Icons.Default.WbSunny)
+                        Text("明天没有课程安排", style = MaterialTheme.typography.titleMedium)
+                        Text("本周的其他课程可在课程表中查看", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    schedule.courses.forEach { block -> HomeCourseRow(block, when { !schedule.tomorrow && block.id == schedule.active -> "正在上"; !schedule.tomorrow && block.id == schedule.next -> "下一节"; else -> null }) { onCourse(block) } }
+                    TextButton(onClick = onTable, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(horizontal = 0.dp)) {
+                        Text("查看完整课表", Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Start)
+                        Icon(Icons.AutoMirrored.Filled.NavigateNext, null)
+                    }
                 }
             }
         }
-        if (courses.isNotEmpty()) item { SectionHeading("今日课程", "点击课程查看时间、教室和教师") }
-        courses.forEach { block -> item(key = block.id) {
-            val start = java.time.LocalTime.parse(Periods.range(block).substringBefore("–"))
-            val end = java.time.LocalTime.parse(Periods.range(block).substringAfter("–"))
-            val status = when { now.toLocalTime() >= end -> "已结束"; now.toLocalTime() >= start -> "进行中"; else -> "待上课" }
-            HomeCourseCard(block, status, { onCourse(block) })
+        item {
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val sideBySide = maxWidth >= 320.dp && LocalDensity.current.fontScale <= 1.1f && holiday != null
+                if (sideBySide) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HomeElectricityCard(campus, Modifier.weight(1f)) { onAcademic("electricity") }
+                    holiday?.let { HomeHolidayCard(it, now.toLocalDate(), Modifier.weight(1f)) { onAcademic("calendar") } }
+                } else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    HomeElectricityCard(campus, Modifier.fillMaxWidth()) { onAcademic("electricity") }
+                    holiday?.let { HomeHolidayCard(it, now.toLocalDate(), Modifier.fillMaxWidth()) { onAcademic("calendar") } }
+                }
+            }
+        }
+        item {
+            ContentCard(Modifier.fillMaxWidth(), onClick = { onAcademic("exams") }) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(if (nextExam == null) "考试安排" else "下一场考试", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        examDays?.let { Text(if (it == 0L) "今天" else "还有 $it 天", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
+                    }
+                    if (nextExam != null) {
+                        Text(nextExam.course, style = MaterialTheme.typography.titleLarge)
+                        if (nextExam.time.isNotBlank()) Text(nextExam.time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        val place = listOf(nextExam.room, nextExam.seat.takeIf { it.isNotBlank() }?.let { "座位 $it" }.orEmpty()).filter(String::isNotBlank).joinToString(" · ")
+                        if (place.isNotBlank()) Text(place, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    } else {
+                        Text("暂无待考科目", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("查看全部考试", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        }
+        item { table?.let {
+            val time = java.time.Instant.ofEpochMilli(it.fetchedAt).atZone(SchoolZone).format(DateTimeFormatter.ofPattern("MM-dd HH:mm"))
+            Text("课表更新于 $time", Modifier.padding(vertical = 8.dp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         } }
-        if (!current) item { InfoPanel("当前查看历史学期；返回当前学期后显示今日安排。") }
-        if (showingTomorrow) {
-            item { SectionHeading("明日课程") }
-            if (tomorrow.isEmpty()) item { EmptyState("明天没有课程安排", "留一点时间给自己，完整安排可在课程表中查看。", Icons.Default.EventAvailable) }
-            tomorrow.forEach { block -> item(key = "tomorrow:${block.id}") { HomeCourseCard(block, "明天", { onCourse(block) }) } }
-        }
-        item { SectionHeading("教务", "学习进度，随时掌握") }
-        item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                listOf(Triple("exams", "考试安排", Icons.Default.Assignment), Triple("grades", "成绩", Icons.Default.Assessment), Triple("plan", "学业进度", Icons.Default.School)).forEach { (key, title, icon) ->
-                    Card(onClick = { onAcademic(key) }, modifier = Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                        Column(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 18.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Icon(icon, null, Modifier.size(24.dp))
-                            Text(title, style = MaterialTheme.typography.labelLarge)
-                        }
-                    }
-                }
-            }
-        }
-        val nextExam = state.academic[academicKey(AcademicKind.EXAMS, state.currentSemester)]?.data?.exams
-            ?.filter { (it.date(examAnchor(state)) ?: LocalDate.MIN) >= now.toLocalDate() }?.sortedWith(compareBy({ it.date(examAnchor(state)) ?: LocalDate.MAX }, { it.time }))?.firstOrNull()
-        if (nextExam != null) item { ServiceRow("下一场考试 · ${nextExam.course}", "${nextExam.time} · ${nextExam.room}", Icons.Default.Assignment) { onAcademic("exams") } }
-        item { SectionHeading("校园生活") }
-        item { ServiceRow("宿舍电费", campus.electric?.let { "${it.balance} 度 · ${campus.dorm?.label.orEmpty()}" } ?: "选择宿舍查看剩余电量", Icons.Default.Bolt) { onAcademic("electricity") } }
-        val activeBreak = nextBreak(campus.calendar, now.toLocalDate())?.takeIf { it.start <= now.toLocalDate() }
-        val event = nextCampusEvent(campus.calendar, now.toLocalDate())
-        if (activeBreak != null || event != null) item {
-            ServiceRow(activeBreak?.let { "${it.title}中" } ?: "假期倒计时", event?.let { "${it.title}：${java.time.temporal.ChronoUnit.DAYS.between(now.toLocalDate(), it.date)} 天 · 校历识别供参考" } ?: "点击查看官方校历", Icons.Default.EventAvailable) { onAcademic("calendar") }
-        }
-        item { CacheLabel(table, Modifier.padding(vertical = 8.dp)) }
     }
 }
 
-@Composable private fun HomeCourseCard(block: CourseBlock, status: String, onClick: () -> Unit) {
-    Card(onClick = onClick, modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(Periods.range(block), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-                Surface(color = if (status == "进行中") MaterialTheme.colorScheme.tertiaryContainer else MaterialTheme.colorScheme.surfaceContainerHighest, shape = MaterialTheme.shapes.small) {
-                    Text(status, Modifier.padding(horizontal = 10.dp, vertical = 3.dp), style = MaterialTheme.typography.labelSmall)
-                }
+@Composable private fun HomeCourseRow(block: CourseBlock, badge: String?, onClick: () -> Unit) {
+    val range = Periods.range(block)
+    Surface(onClick = onClick, shape = MaterialTheme.shapes.medium, color = if (badge == null) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.secondaryContainer) {
+        Row(Modifier.fillMaxWidth().padding(12.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+            Column(Modifier.width(58.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(range.substringBefore('–'), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(range.substringAfter('–'), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Text(block.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.LocationOn, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(block.room.ifBlank { "教室待公布" }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(block.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                if (block.room.isNotBlank()) Text(block.room, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (block.teacher.isNotBlank()) Text(block.teacher, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                badge?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary) }
             }
+        }
+    }
+}
+
+@Composable private fun HomeElectricityCard(campus: CampusState, modifier: Modifier, onClick: () -> Unit) {
+    val low = campus.electric?.balance?.toBigDecimalOrNull()?.let { it < 10.toBigDecimal() } == true
+    Card(onClick = onClick, modifier = modifier, colors = CardDefaults.cardColors(containerColor = if (low) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.Bolt, null, Modifier.size(22.dp))
+            Text("剩余电量", style = MaterialTheme.typography.titleMedium)
+            val electric = campus.electric
+            if (electric != null) {
+                Text("${electric.balance} 度", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+                val checked = java.time.Instant.ofEpochMilli(electric.checkedAt).atZone(SchoolZone).format(DateTimeFormatter.ofPattern("HH:mm"))
+                Text("${campus.dorm?.building?.name.orEmpty()} · $checked", style = MaterialTheme.typography.bodySmall)
+            } else Text(if (campus.dorm == null) "还没选宿舍" else if (campus.error == null) "还没查到" else "查询失败", style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+@Composable private fun HomeHolidayCard(event: CampusEvent, today: LocalDate, modifier: Modifier, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+        Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(Icons.Default.EventAvailable, null, Modifier.size(22.dp))
+            Text("${event.title}还有", style = MaterialTheme.typography.titleMedium)
+            val days = java.time.temporal.ChronoUnit.DAYS.between(today, event.date)
+            Text(if (days == 0L) "今天" else "$days 天", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
+            Text("${event.date.monthValue}月${event.date.dayOfMonth}日", style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -444,28 +488,21 @@ import java.time.format.DateTimeFormatter
 }
 
 @Composable private fun CampusScreen(onOpen: (String) -> Unit) {
+    val groups = listOf(
+        "教务" to listOf(Triple("exams", "考试安排", "时间、考场、座位号"), Triple("grades", "成绩", "每学期的课程成绩"), Triple("plan", "学业完成情况", "毕业要修多少学分"), Triple("calendar", "校历", "什么时候放假？")),
+        "生活" to listOf(Triple("electricity", "电费", "宿舍还剩多少电费"), Triple("netfee", "校园网充值", "续费、查套餐"), Triple("checkin", "签到", "按时点一下，别断签"), Triple("leave", "请销假", "请假、销假都在这里")),
+        "杂项" to listOf(Triple("ehall", "一网通办", "更多校园线上服务"), Triple("eams", "教务系统", "进入学校教务网页"))
+    )
     LazyColumn(Modifier.fillMaxSize().testTag("campus"), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        item {
-            Surface(shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.secondaryContainer) {
-                Row(Modifier.fillMaxWidth().padding(22.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AccountBalance, null, Modifier.size(36.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("校园服务", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                        Text("教务与生活，触手可及", style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
+        groups.forEach { (title, entries) ->
+            item(key = title) { SectionHeading(title) }
+            entries.forEach { (key, label, detail) ->
+                item(key = key) { ServiceRow(label, detail, when (key) {
+                    "exams" -> Icons.Default.Assignment; "grades" -> Icons.Default.Assessment; "plan" -> Icons.Default.School; "calendar" -> Icons.Default.EventAvailable;
+                    "electricity" -> Icons.Default.Bolt; "netfee" -> Icons.Default.Wifi; "checkin" -> Icons.Default.Verified; "leave" -> Icons.Default.Description; "eams" -> Icons.Default.Language; else -> Icons.Default.Apps
+                }) { onOpen(key) } }
             }
         }
-        item { SectionHeading("教务服务") }
-        listOf(Triple("exams", "考试安排", "考试时间、考场与座位"), Triple("grades", "成绩", "学期成绩、分项与绩点"), Triple("plan", "学业完成情况", "学分进度与教学计划")).forEach { (key, title, detail) ->
-            item { ServiceRow(title, detail, when (key) { "exams" -> Icons.Default.Assignment; "grades" -> Icons.Default.Assessment; else -> Icons.Default.School }) { onOpen(key) } }
-        }
-        item { SectionHeading("校园生活") }
-        listOf(Triple("electricity", "电费", "宿舍电量与每日用电"), Triple("calendar", "校历", "学期安排与假期倒计时"), Triple("netfee", "校园网充值", "在学校网页办理充值"), Triple("checkin", "签到", "打开学校签到服务"), Triple("leave", "请销假", "打开学校请销假服务"), Triple("eams", "教务系统", "进入学校教务网页"), Triple("ehall", "一网通办", "更多校园线上服务")).forEach { (key, title, detail) ->
-            item { ServiceRow(title, detail, when (key) { "electricity" -> Icons.Default.Bolt; "calendar" -> Icons.Default.EventAvailable; "netfee" -> Icons.Default.Wifi; "checkin" -> Icons.Default.LocationOn; "leave" -> Icons.Default.Description; "eams" -> Icons.Default.Language; else -> Icons.Default.Apps }) { onOpen(key) } }
-        }
-        item { SectionHeading("偏好设置") }
-        item { ServiceRow("设置", "账号、课程表、提醒与桌面", Icons.Default.Settings) { onOpen("settings") } }
     }
 }
 @Composable private fun ErrorCard(message: String) { Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) { Text(message, Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer) } }
