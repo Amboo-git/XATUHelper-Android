@@ -35,6 +35,10 @@ class CheckinLocationUiTest {
             compose.activity.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             if (android.os.Build.VERSION.SDK_INT >= 27) { compose.activity.setShowWhenLocked(true); compose.activity.setTurnScreenOn(true) }
         }
+        // The first activity can still be waiting for MIUI's screen-on transition.
+        // Wait for the real window before replacing its Compose content.
+        compose.waitUntil(10_000) { compose.activity.hasWindowFocus() }
+        compose.waitForIdle()
     }
     @After fun restoreQaSettings() {
         compose.runOnUiThread { bridge?.close(); browser?.apply { stopLoading(); destroy() } }
