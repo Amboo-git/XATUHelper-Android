@@ -94,7 +94,7 @@ import java.time.format.DateTimeFormatter
             Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(80.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.School, null, Modifier.size(44.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
             }
-            Text("XATU Helper", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+            Text("XATune", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             Text("校园生活，一处掌握", style = MaterialTheme.typography.titleMedium)
             Text("连接学校统一身份认证，查看教务信息，使用校园服务。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))

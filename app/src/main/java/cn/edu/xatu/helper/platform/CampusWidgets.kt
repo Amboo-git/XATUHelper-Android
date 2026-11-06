@@ -21,7 +21,7 @@ object CampusWidgets {
                 val view = RemoteViews(context.packageName, R.layout.widget_campus)
                 var title = when (type) { "course" -> "课程"; "electricity" -> "宿舍电费"; else -> "假期倒计时" }
                 var body = "登录后查看校园信息"
-                var subtitle = "点击打开 XATU Helper"
+                var subtitle = "点击打开 XATune"
                 var action = "打开"
                 val page = when (type) { "course" -> "timetable"; "electricity" -> "electricity"; else -> "calendar" }
                 if (account.isNotBlank()) when (type) {

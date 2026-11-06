@@ -133,7 +133,7 @@ class MilestoneTest {
         compose.onNodeWithText("复制诊断数据").assertIsDisplayed()
         screenshot("diagnostics.png")
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("appVersion"))
-        compose.onNodeWithTag("appVersion").assertTextEquals("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})")
+        compose.onNodeWithTag("appVersion").assertTextEquals("XATune ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})")
         compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("githubRepository"))
         compose.onNodeWithTag("githubRepository").assertHasClickAction().assertIsDisplayed()
         compose.onNodeWithText("Kelejun/XATUHelper-Android").assertIsDisplayed()

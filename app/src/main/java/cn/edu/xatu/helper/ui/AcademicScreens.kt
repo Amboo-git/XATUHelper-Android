@@ -261,7 +261,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                         Text(diagnosticSummary(state), style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("diagnostics"))
                         TextButton(onClick = {
                             (context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager)
-                                .setPrimaryClip(android.content.ClipData.newPlainText("XATU Helper 诊断", diagnosticSummary(state)))
+                                .setPrimaryClip(android.content.ClipData.newPlainText("XATune 诊断", diagnosticSummary(state)))
                             copied = true
                         }) { Icon(Icons.Default.ContentCopy, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(if (copied) "已复制诊断数据" else "复制诊断数据") }
                     }
@@ -277,7 +277,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             item { ContentCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     IconTile(Icons.Default.School, prominent = true)
-                    Text("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("appVersion").clickable {
+                    Text("XATune ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.testTag("appVersion").clickable {
                         versionTaps++
                         if (versionTaps >= 5) { locationPreferences.reveal(); versionTaps = 0 }
                     })

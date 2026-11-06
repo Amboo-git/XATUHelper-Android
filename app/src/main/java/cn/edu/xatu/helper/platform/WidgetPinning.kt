@@ -12,7 +12,7 @@ import android.provider.Settings
 object WidgetPinning {
     const val PINNED = "cn.edu.xatu.helper.WIDGET_PINNED"
     const val CONFIRMED = "pin_confirmed"
-    const val MANUAL_ADD = "请长按桌面，进入小组件列表添加「XATU Helper」。"
+    const val MANUAL_ADD = "请长按桌面，进入小组件列表添加「XATune」。"
     const val PERMISSION_HELP = "部分系统需要先允许「桌面快捷方式」或「添加到桌面」权限。请在应用权限或其他权限中开启，再返回申请添加。若没有此选项，可直接申请添加。"
 
     fun request(context: Context, provider: Class<out CampusWidgetProvider>): String {

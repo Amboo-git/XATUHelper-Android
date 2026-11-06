@@ -265,7 +265,7 @@ private fun moneyTime(at: Long) = Instant.ofEpochMilli(at).atZone(SchoolZone).fo
         onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     fun openPermissions() {
-        if (!WidgetPinning.openPermissionSettings(context)) message = "无法打开设置，请手动进入系统设置 → 应用 → XATU Helper → 权限。"
+        if (!WidgetPinning.openPermissionSettings(context)) message = "无法打开设置，请手动进入系统设置 → 应用 → XATune → 权限。"
     }
     CampusFrame("桌面小组件", state, onBack) {
         Column(Modifier.padding(horizontal = 20.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {

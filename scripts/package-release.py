@@ -27,7 +27,7 @@ commit = subprocess.check_output(['git', 'rev-parse', '--short=7', 'HEAD'], cwd=
 if f'{version} ({commit})'.encode() not in dex:
     raise SystemExit('APK version/commit does not match HEAD; rebuild after committing before packaging.')
 
-unsigned = out / f'XATUHelper-{version}-unsigned.apk'
+unsigned = out / f'XATune-{version}-unsigned.apk'
 shutil.copy2(source, unsigned)
 keystore = os.environ.get('RELEASE_KEYSTORE')
 if keystore:
@@ -37,12 +37,12 @@ if keystore:
     signing_args = ['--ks', keystore, '--ks-key-alias', alias, '--ks-pass', 'env:RELEASE_STORE_PASSWORD']
     if os.environ.get('RELEASE_KEY_PASSWORD'):
         signing_args += ['--key-pass', 'env:RELEASE_KEY_PASSWORD']
-    signed = out / f'XATUHelper-{version}.apk'
+    signed = out / f'XATune-{version}.apk'
 else:
     signing = 'local-development-key-not-a-production-release-key'
     key = Path(os.environ.get('ANDROID_USER_HOME', str(Path.home() / '.android'))) / 'debug.keystore'
     signing_args = ['--ks', str(key), '--ks-key-alias', 'androiddebugkey', '--ks-pass', 'pass:android', '--key-pass', 'pass:android']
-    signed = out / f'XATUHelper-{version}-devsigned.apk'
+    signed = out / f'XATune-{version}-devsigned.apk'
 subprocess.run([str(build_tools / 'apksigner'), 'sign', *signing_args, '--out', str(signed), str(unsigned)], check=True)
 verification = subprocess.check_output([str(build_tools / 'apksigner'), 'verify', '--verbose', '--print-certs', str(signed)], text=True)
 (out / 'signature-verification.txt').write_text(verification)

@@ -1,10 +1,10 @@
-# XATUHelper-Android
+# XATune for Android
 
-西安工业大学校园助手的独立原生 Android 工程。使用 Kotlin、Jetpack Compose 和官方 Material Design 3 组件，以 iOS XATUHelper 的业务行为为参考。工程不依赖 Swift、Skip 或原 iOS 工程。
+西安工业大学校园助手的独立原生 Android 工程。使用 Kotlin、Jetpack Compose 和官方 Material Design 3 组件，以 iOS XATune 的业务行为为参考。工程不依赖 Swift、Skip 或原 iOS 工程。
 
-> iOS App 与 Widget 请前往 [XATUHelper](https://github.com/Kelejun/XATUHelper)。本仓库维护原生 Android 版，替代原 Skip 迁移版本。
+> iOS App 与 Widget 请前往 [XATune](https://github.com/Kelejun/XATUHelper)。本仓库维护原生 Android 版，替代原 Skip 迁移版本。
 
-## 当前功能（1.1.4）
+## 当前功能（1.1.5）
 
 - MD3 登录、首页、课程表、校园导航，动态配色与深色模式。
 - 启动器图标支持自适应形状；Android 13 及以上在支持的桌面开启“主题图标”后，学士帽图案与背景跟随系统壁纸配色。

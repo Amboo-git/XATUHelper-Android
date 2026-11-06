@@ -99,7 +99,7 @@ class VisualAuditTest {
             compose.onNodeWithContentDescription("设置").performClick()
             shot("$name-settings")
             compose.onNodeWithTag("settings").performScrollToNode(hasTestTag("appVersion"))
-            compose.onNodeWithTag("appVersion").assertTextEquals("XATU Helper ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})")
+            compose.onNodeWithTag("appVersion").assertTextEquals("XATune ${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_COMMIT})")
             shot("$name-about")
             compose.onNodeWithTag("settings").performScrollToNode(hasText("提醒设置"))
             compose.onNodeWithText("提醒设置").performClick()
