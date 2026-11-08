@@ -33,6 +33,7 @@ internal class CheckinLocationBridge(private val web: WebView, private val topUr
                     result.put("mode", "custom").put("latitude", point.latitude).put("longitude", point.longitude)
                 }
             }
+            WebDiagnosticLog.record(web.context, "checkin-bridge", "reply", "mode=${result.optString("mode")} id=$id")
             runCatching { reply.postMessage(result.toString()) }
         }
         listening = true

@@ -20,10 +20,11 @@ android {
         applicationId = "cn.edu.xatu.helper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 22
+        versionCode = 23
         versionName = "1.1.5"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
+        buildConfigField("boolean", "WEB_DIAGNOSTICS", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildFeatures { compose = true; buildConfig = true }
@@ -53,6 +54,14 @@ android {
         buildConfigField("boolean", "DEMO_ENABLED", "true")
         matchingFallbacks += "debug"
     }
+    buildTypes.create("diagnostic") {
+        initWith(buildTypes.getByName("release"))
+        applicationIdSuffix = ".diagnostic"
+        signingConfig = signingConfigs.getByName("debug")
+        matchingFallbacks += "release"
+        buildConfigField("boolean", "WEB_DIAGNOSTICS", "true")
+    }
+    buildTypes.getByName("qa") { buildConfigField("boolean", "WEB_DIAGNOSTICS", "true") }
     testBuildType = "qa"
     testOptions { unitTests.isReturnDefaultValues = true }
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }

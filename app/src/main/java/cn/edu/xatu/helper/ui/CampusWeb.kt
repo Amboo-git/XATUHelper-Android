@@ -48,12 +48,14 @@ object CampusLinks {
     var web by remember { mutableStateOf<WebView?>(null) }
     var locationBridge by remember { mutableStateOf<cn.edu.xatu.helper.platform.CheckinLocationBridge?>(null) }
     val checkinLocation by rememberCheckinLocationSettings()
+    var diagnostics by remember { mutableStateOf<cn.edu.xatu.helper.platform.WebDiagnostics?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
     var navigation by remember { mutableIntStateOf(0) }
     LaunchedEffect(loading, navigation) {
         if (loading) {
             delay(30_000)
+            diagnostics?.event("load-timeout"); diagnostics?.capture("timeout")
             loading = false
             error = "网页加载超时，请检查网络后点击右上角重试，也可在浏览器中打开。"
         }
@@ -70,10 +72,11 @@ object CampusLinks {
     val backModifier = Modifier.predictiveBack { if (web?.canGoBack() == true) web?.goBack() else onClose() }
     DisposableEffect(Unit) { onDispose {
         pendingLocation?.let { it.second.invoke(it.first, false, false) }; files?.onReceiveValue(null)
+        diagnostics?.close(); diagnostics = null
         locationBridge?.close(); locationBridge = null
         web?.apply { stopLoading(); webChromeClient = null; webViewClient = WebViewClient(); removeAllViews(); destroy() }; web = null
     } }
-    Scaffold(modifier = backModifier, topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭网页") } }, actions = { IconButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(web?.url ?: url))) }.onFailure { error = "没有可打开网页的浏览器" } }) { Icon(Icons.Default.OpenInNew, "在浏览器中打开") }; IconButton(onClick = { error = null; web?.reload() }) { Icon(Icons.Default.Refresh, "重新加载网页") } }) }) { padding ->
+    Scaffold(modifier = backModifier, topBar = { TopAppBar(title = { Text(title) }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭网页") } }, actions = { WebDiagnosticExport { diagnostics?.capture("export") }; IconButton(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(web?.url ?: url))) }.onFailure { error = "没有可打开网页的浏览器" } }) { Icon(Icons.Default.OpenInNew, "在浏览器中打开") }; IconButton(onClick = { error = null; web?.reload() }) { Icon(Icons.Default.Refresh, "重新加载网页") } }) }) { padding ->
         Column(Modifier.padding(padding).consumeWindowInsets(padding).imePadding().fillMaxSize()) {
             LoadingProgress(loading)
             if (page == "checkin") Box(Modifier.padding(12.dp)) {
@@ -90,8 +93,13 @@ object CampusLinks {
                 settings.allowFileAccess = false; settings.allowContentAccess = true
                 settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
                 settings.setGeolocationEnabled(page == "checkin")
+                diagnostics = cn.edu.xatu.helper.platform.WebDiagnostics(this, page).also { it.attach() }
+                diagnostics?.event("location-bridge", "attached=${locationBridge != null} documentStart=${locationBridge?.supportsDocumentStart} customEnabled=${checkinLocation.enabled}")
                 webChromeClient = object : WebChromeClient() {
+                    override fun onConsoleMessage(message: ConsoleMessage): Boolean = diagnostics?.console(message) ?: false
+                    override fun onProgressChanged(view: WebView, progress: Int) { if (progress == 100) diagnostics?.event("progress", "100") }
                     override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+                        diagnostics?.event("location-prompt", "origin=${cn.edu.xatu.helper.platform.WebDiagnosticText.url(origin)}")
                         if (page == "checkin" && cn.edu.xatu.helper.platform.CheckinLocationPreferences(context).read().enabled) {
                             callback.invoke(origin, false, false)
                             if (locationBridge?.supportsDocumentStart != true) error = "请更新 Android System WebView 后使用签到测试。"
@@ -107,8 +115,12 @@ object CampusLinks {
                     }
                 }
                 webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? { diagnostics?.request(request); return null }
+                    override fun onPageCommitVisible(view: WebView, url: String) { diagnostics?.event("page-visible", cn.edu.xatu.helper.platform.WebDiagnosticText.url(url)) }
+                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean { diagnostics?.event("renderer-gone", "crashed=${detail.didCrash()} priority=${detail.rendererPriorityAtExit()}"); return false }
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         val target = request.url.toString()
+                        diagnostics?.navigation(request, SchoolUrls.trusted(target))
                         if (SchoolUrls.trusted(target)) return false
                         if (request.hasGesture() && request.url.scheme in listOf("https", "http", "tel", "mailto", "alipays", "weixin")) {
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, request.url)) }.onFailure { error = "没有可打开此链接的应用" }
@@ -116,11 +128,11 @@ object CampusLinks {
                         loading = false
                         return true
                     }
-                    override fun onPageStarted(view: WebView, url: String, icon: android.graphics.Bitmap?) { navigation++; loading = true; error = null }
-                    override fun onPageFinished(view: WebView, url: String) { loading = false; CookieManager.getInstance().flush() }
-                    override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) { if (request.isForMainFrame) { loading = false; error = "网页加载失败，请检查网络后重试" } }
-                    override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) { if (request.isForMainFrame) { loading = false; error = "学校服务返回 HTTP ${response.statusCode}" } }
-                    override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, sslError: android.net.http.SslError) { handler.cancel(); loading = false; error = "学校网页的安全连接校验失败" }
+                    override fun onPageStarted(view: WebView, url: String, icon: android.graphics.Bitmap?) { diagnostics?.started(url); navigation++; loading = true; error = null }
+                    override fun onPageFinished(view: WebView, url: String) { diagnostics?.finished(url); loading = false; CookieManager.getInstance().flush() }
+                    override fun onReceivedError(view: WebView, request: WebResourceRequest, e: WebResourceError) { diagnostics?.error(request, e); if (request.isForMainFrame) { loading = false; error = "网页加载失败，请检查网络后重试" } }
+                    override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) { diagnostics?.http(request, response); if (request.isForMainFrame) { loading = false; error = "学校服务返回 HTTP ${response.statusCode}" } }
+                    override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, sslError: android.net.http.SslError) { diagnostics?.ssl(sslError); handler.cancel(); loading = false; error = "学校网页的安全连接校验失败" }
                 }
                 loadUrl(url)
             } })

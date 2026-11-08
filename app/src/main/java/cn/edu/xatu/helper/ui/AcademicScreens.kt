@@ -255,6 +255,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             item { ServiceRow("提醒设置", "上课、考试与系统通知权限", Icons.Default.Notifications, onClick = onReminders) }
             item { ServiceRow("桌面小组件", "在桌面查看课程、电费和假期", Icons.Default.Widgets, onClick = onWidgets) }
             item { SectionHeading("帮助与诊断") }
+            if (BuildConfig.WEB_DIAGNOSTICS) item { WebDiagnosticExport() }
             item { ToggleRow("显示诊断数据", "查看本机缓存状态与版本信息", state.showDiagnostics, onDiagnostics, switchModifier = Modifier.testTag("diagnosticsSetting")) }
             if (state.showDiagnostics) item {
                 ContentCard(Modifier.fillMaxWidth()) {
