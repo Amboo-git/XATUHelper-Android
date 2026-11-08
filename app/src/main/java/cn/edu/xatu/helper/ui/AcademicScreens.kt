@@ -274,7 +274,6 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                 item { ServiceRow("选择位置", location.coordinate?.let { "%.6f, %.6f".format(java.util.Locale.ROOT, it.latitude, it.longitude) } ?: "未选择", Icons.Default.LocationOn, Modifier.testTag("checkinLocationPicker"), onClick = onCheckinLocation) }
                 item { InfoPanel("先选择位置，再开启传入定位。所选坐标保存在本机，仅用于签到网页。") }
             }
-            item { ServiceRow("隐私政策", "查看数据使用与删除方式", Icons.Default.PrivacyTip) { privacy = true } }
             item { SectionHeading("关于") }
             item { ContentCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -295,6 +294,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                 }
             } }
             item { ServiceRow("GitHub 仓库", "Kelejun/XATUHelper-Android", Icons.Default.Code, Modifier.testTag("githubRepository")) { uriHandler.openUri("https://github.com/Kelejun/XATUHelper-Android") } }
+            item { ServiceRow("隐私政策", "查看数据使用与删除方式", Icons.Default.PrivacyTip) { privacy = true } }
             item { Spacer(Modifier.height(12.dp)); OutlinedButton(onClick = { confirmLogout = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("logout"), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("退出登录") } }
         }
     }
