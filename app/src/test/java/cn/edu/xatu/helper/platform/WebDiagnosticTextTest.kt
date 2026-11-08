@@ -17,6 +17,18 @@ class WebDiagnosticTextTest {
         assertFalse(value.contains('\n'))
         assertTrue(value.contains("https://school.edu/list"))
     }
+    @Test fun structuredDiagnosticsKeepFractionalDimensionsAndRemainValidJson() {
+        val cleaned = WebDiagnosticText.clean("""{"visual":[390.5084745762712,751.186440677966,1],"ms":1000000,"url":"https://school.edu/api?token=private","symbol":"student2026123456"}""")
+        val parsed = com.google.gson.JsonParser.parseString(cleaned).asJsonObject
+        assertEquals(390.5084745762712, parsed.getAsJsonArray("visual")[0].asDouble, 0.000001)
+        assertEquals(1000000, parsed.get("ms").asInt)
+        assertFalse(cleaned.contains("private"))
+        assertFalse(cleaned.contains("2026123456"))
+    }
+    @Test fun urlQueriesCannotBreakResourcePaths() {
+        assertEquals("http://school.edu/home.action", WebDiagnosticText.url("http://school.edu/home.action?ticket={invalid}"))
+        assertEquals("https://school.edu/[redacted]", WebDiagnosticText.url("https://school.edu/[redacted]?token=private"))
+    }
     @Test fun malformedAndOversizedMessagesAreBounded() {
         assertEquals("[invalid-url]", WebDiagnosticText.url("https://["))
         assertTrue(WebDiagnosticText.clean("中".repeat(10000)).length <= 6000)
