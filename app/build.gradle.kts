@@ -21,7 +21,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 25
-        versionName = "1.1.5"
+        versionName = "1.1.6"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
         buildConfigField("boolean", "WEB_DIAGNOSTICS", "false")
