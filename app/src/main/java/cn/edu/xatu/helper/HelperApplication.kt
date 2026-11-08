@@ -11,11 +11,14 @@ class HelperApplication : Application() {
         private set
     lateinit var repository: TimetableRepository
         private set
+    internal lateinit var cookies: SchoolCookies
+        private set
     val updates by lazy { AppUpdateRepository(UpdatePreferences(this)) }
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) android.webkit.WebView.setWebContentsDebuggingEnabled(true)
         val vault = SecretVault(this)
-        val cookies = SchoolCookies(CookieManager.getInstance().apply { setAcceptCookie(true) }, vault)
+        cookies = SchoolCookies(CookieManager.getInstance().apply { setAcceptCookie(true) }, vault)
         store = LocalStore(this)
         repository = TimetableRepository(store, vault, cookies, SchoolNetwork(cookies))
         campusRepository = CampusRepository(this, store, repository, PayNetwork(cookies))

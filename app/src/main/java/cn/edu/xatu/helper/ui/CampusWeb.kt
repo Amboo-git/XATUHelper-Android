@@ -48,6 +48,7 @@ object CampusLinks {
     var web by remember { mutableStateOf<WebView?>(null) }
     var locationBridge by remember { mutableStateOf<cn.edu.xatu.helper.platform.CheckinLocationBridge?>(null) }
     val checkinLocation by rememberCheckinLocationSettings()
+    var documents by remember { mutableStateOf<cn.edu.xatu.helper.platform.CampusWebDocuments?>(null) }
     var diagnostics by remember { mutableStateOf<cn.edu.xatu.helper.platform.WebDiagnostics?>(null) }
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -72,6 +73,7 @@ object CampusLinks {
     val backModifier = Modifier.predictiveBack { if (web?.canGoBack() == true) web?.goBack() else onClose() }
     DisposableEffect(Unit) { onDispose {
         pendingLocation?.let { it.second.invoke(it.first, false, false) }; files?.onReceiveValue(null)
+        documents?.close(); documents = null
         diagnostics?.close(); diagnostics = null
         locationBridge?.close(); locationBridge = null
         web?.apply { stopLoading(); webChromeClient = null; webViewClient = WebViewClient(); removeAllViews(); destroy() }; web = null
@@ -88,6 +90,8 @@ object CampusLinks {
             error?.let { Text(it, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) }
             AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { ctx -> WebView(ctx).apply {
                 web = this
+                cn.edu.xatu.helper.platform.configureCampusWebView(this)
+                documents = cn.edu.xatu.helper.platform.CampusWebDocuments(this.context)
                 if (page == "checkin") locationBridge = cn.edu.xatu.helper.platform.CheckinLocationBridge(this).also { it.attach() }
                 settings.javaScriptEnabled = true; settings.domStorageEnabled = true
                 settings.allowFileAccess = false; settings.allowContentAccess = true
@@ -115,13 +119,13 @@ object CampusLinks {
                     }
                 }
                 webViewClient = object : WebViewClient() {
-                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? { diagnostics?.request(request); return null }
+                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? { diagnostics?.request(request); return documents?.intercept(request) }
                     override fun onPageCommitVisible(view: WebView, url: String) { diagnostics?.event("page-visible", cn.edu.xatu.helper.platform.WebDiagnosticText.url(url)) }
                     override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean { diagnostics?.event("renderer-gone", "crashed=${detail.didCrash()} priority=${detail.rendererPriorityAtExit()}"); return false }
                     override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                         val target = request.url.toString()
                         diagnostics?.navigation(request, SchoolUrls.trusted(target))
-                        if (SchoolUrls.trusted(target)) return false
+                        if (SchoolUrls.trusted(target)) return documents?.redirect(view, request) ?: false
                         if (request.hasGesture() && request.url.scheme in listOf("https", "http", "tel", "mailto", "alipays", "weixin")) {
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, request.url)) }.onFailure { error = "没有可打开此链接的应用" }
                         } else error = "已停止打开不受支持的跳转地址"

@@ -39,14 +39,3 @@ internal fun WebDiagnosticExport(beforeExport: () -> Unit = {}) {
         picker.launch("XATune-WebView-${SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(Date())}.txt")
     }) { Text(if (busy) "导出中…" else "导出诊断") }
 }
-
-@Composable
-internal fun WebDiagnosticLayoutControl() {
-    if (!BuildConfig.WEB_DIAGNOSTICS) return
-    val context = LocalContext.current
-    var enabled by remember { mutableStateOf(cn.edu.xatu.helper.platform.WebDiagnosticOptions.matchParent(context)) }
-    ToggleRow("MATCH_PARENT 布局", "${if (enabled) "对照模式" else "原有布局"} · 重新打开网页后生效", enabled, {
-        enabled = it
-        cn.edu.xatu.helper.platform.WebDiagnosticOptions.setMatchParent(context, it)
-    })
-}

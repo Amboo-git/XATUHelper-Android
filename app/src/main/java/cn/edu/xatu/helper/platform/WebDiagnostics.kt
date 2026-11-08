@@ -3,7 +3,6 @@ package cn.edu.xatu.helper.platform
 import android.content.Context
 import android.os.Build
 import android.view.View
-import android.view.ViewGroup
 import android.webkit.*
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -61,15 +60,13 @@ internal class WebDiagnostics(private val web: WebView, page: String) {
     private var consoleCount = 0
     private var generation = 0
     private var scheduledGeneration = -1
-    private val matchParent = WebDiagnosticOptions.matchParent(web.context)
     private var handler: androidx.webkit.ScriptHandler? = null
     private val script by lazy { web.context.assets.open("web-diagnostics.js").bufferedReader().use { it.readText() } }
     fun event(name: String, detail: String = "") { if (active) WebDiagnosticLog.record(web.context, session, name, detail) }
     fun attach() {
         if (!active) return
         val pkg = WebViewCompat.getCurrentWebViewPackage(web.context)
-        event("open", "engine=${pkg?.packageName}/${pkg?.versionName} viewport=${web.resources.displayMetrics} fontScale=${web.resources.configuration.fontScale} layoutMode=${if (matchParent) "match-parent" else "baseline"} UA=${web.settings.userAgentString} js=${web.settings.javaScriptEnabled} storage=${web.settings.domStorageEnabled} mixed=${web.settings.mixedContentMode} thirdPartyCookies=${CookieManager.getInstance().acceptThirdPartyCookies(web)}")
-        if (matchParent) web.layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+        event("open", "engine=${pkg?.packageName}/${pkg?.versionName} viewport=${web.resources.displayMetrics} fontScale=${web.resources.configuration.fontScale} layoutMode=match-parent UA=${web.settings.userAgentString} js=${web.settings.javaScriptEnabled} storage=${web.settings.domStorageEnabled} mixed=${web.settings.mixedContentMode} thirdPartyCookies=${CookieManager.getInstance().acceptThirdPartyCookies(web)}")
         web.addOnAttachStateChangeListener(attachListener)
         val documentStart = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         event("instrumentation", "documentStart=$documentStart")
@@ -81,7 +78,7 @@ internal class WebDiagnostics(private val web: WebView, page: String) {
         val parents = generateSequence(web.parent) { it.parent }.filterIsInstance<View>().take(5).joinToString(";") {
             "${it.javaClass.simpleName}:size=${it.width}x${it.height},lp=${it.layoutParams?.width}x${it.layoutParams?.height},layer=${it.layerType},hardware=${it.isHardwareAccelerated}"
         }
-        event("native-state", "$reason attached=${web.isAttachedToWindow} hardware=${web.isHardwareAccelerated} layer=${web.layerType} measured=${web.measuredWidth}x${web.measuredHeight} size=${web.width}x${web.height} lp=${web.layoutParams?.width}x${web.layoutParams?.height} layoutMode=${if (matchParent) "match-parent" else "baseline"} parents=$parents")
+        event("native-state", "$reason attached=${web.isAttachedToWindow} hardware=${web.isHardwareAccelerated} layer=${web.layerType} measured=${web.measuredWidth}x${web.measuredHeight} size=${web.width}x${web.height} lp=${web.layoutParams?.width}x${web.layoutParams?.height} layoutMode=match-parent parents=$parents")
     }
     private val attachListener = object : View.OnAttachStateChangeListener {
         override fun onViewAttachedToWindow(view: View) { web.post { if (active) nativeState("attached") } }

@@ -257,7 +257,6 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             item { SectionHeading("帮助与诊断") }
             if (BuildConfig.WEB_DIAGNOSTICS) {
                 item { WebDiagnosticExport() }
-                item { WebDiagnosticLayoutControl() }
             }
             item { ToggleRow("显示诊断数据", "查看本机缓存状态与版本信息", state.showDiagnostics, onDiagnostics, switchModifier = Modifier.testTag("diagnosticsSetting")) }
             if (state.showDiagnostics) item {

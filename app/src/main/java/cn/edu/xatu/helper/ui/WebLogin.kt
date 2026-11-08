@@ -17,12 +17,17 @@ import cn.edu.xatu.helper.data.SchoolUrls
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun WebLogin(account: String, onClose: () -> Unit, onComplete: () -> Unit, onError: (String) -> Unit) {
     var web by remember { mutableStateOf<WebView?>(null) }
+    var documents by remember { mutableStateOf<cn.edu.xatu.helper.platform.CampusWebDocuments?>(null) }
     var diagnostics by remember { mutableStateOf<cn.edu.xatu.helper.platform.WebDiagnostics?>(null) }
     var loading by remember { mutableStateOf(true) }
     var landed by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     val backModifier = Modifier.predictiveBack { if (web?.canGoBack() == true) web?.goBack() else onClose() }
-    DisposableEffect(Unit) { onDispose { diagnostics?.close(); diagnostics = null; web?.apply { stopLoading(); webViewClient = WebViewClient(); destroy() }; web = null } }
+    DisposableEffect(Unit) { onDispose {
+        documents?.close(); documents = null
+        diagnostics?.close(); diagnostics = null
+        web?.apply { stopLoading(); webViewClient = WebViewClient(); destroy() }; web = null
+    } }
     Scaffold(modifier = backModifier, topBar = {
         TopAppBar(title = { Text("统一身份认证") }, navigationIcon = { IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "关闭网页登录") } },
             actions = { WebDiagnosticExport { diagnostics?.capture("export") }; TextButton(onClick = onComplete, enabled = landed && !loading) { Text("完成登录") } })
@@ -37,6 +42,8 @@ import cn.edu.xatu.helper.data.SchoolUrls
             AndroidView(modifier = Modifier.weight(1f).fillMaxWidth(), factory = { context ->
                 WebView(context).apply {
                     web = this
+                    cn.edu.xatu.helper.platform.configureCampusWebView(this)
+                    documents = cn.edu.xatu.helper.platform.CampusWebDocuments(this.context)
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.allowFileAccess = false
@@ -47,13 +54,13 @@ import cn.edu.xatu.helper.data.SchoolUrls
                         override fun onConsoleMessage(message: ConsoleMessage): Boolean = diagnostics?.console(message) ?: false
                     }
                     webViewClient = object : WebViewClient() {
-                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? { diagnostics?.request(request); return null }
+                        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? { diagnostics?.request(request); return documents?.intercept(request) }
                         override fun onPageCommitVisible(view: WebView, url: String) { diagnostics?.event("page-visible", cn.edu.xatu.helper.platform.WebDiagnosticText.url(url)) }
                         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean { diagnostics?.event("renderer-gone", "crashed=${detail.didCrash()}"); return false }
                         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                             diagnostics?.navigation(request, SchoolUrls.trusted(request.url.toString()))
                             if (!SchoolUrls.trusted(request.url.toString())) { error = "已停止打开学校域名以外的地址"; return true }
-                            return false
+                            return documents?.redirect(view, request) ?: false
                         }
                         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) { diagnostics?.started(url); loading = true; landed = false }
                         override fun onPageFinished(view: WebView, url: String) {
