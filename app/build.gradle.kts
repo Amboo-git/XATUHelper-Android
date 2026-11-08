@@ -20,12 +20,20 @@ android {
         applicationId = "cn.edu.xatu.helper"
         minSdk = 26
         targetSdk = 36
-        versionCode = 25
-        versionName = "1.1.6"
+        versionCode = 26
+        versionName = "1.1.7"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
         buildConfigField("boolean", "WEB_DIAGNOSTICS", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+            isUniversalApk = false
+        }
     }
     buildFeatures { compose = true; buildConfig = true }
     compileOptions {

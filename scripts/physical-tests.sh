@@ -24,7 +24,8 @@ mkdir -p "$out"
   "$adb_bin" shell wm density
   "$adb_bin" shell settings get system font_scale
 } > "$out/device.txt"
-"$adb_bin" install -r app/build/outputs/apk/qa/app-qa.apk
+device_abi=$("$adb_bin" shell getprop ro.product.cpu.abi | tr -d '\r')
+"$adb_bin" install -r "app/build/outputs/apk/qa/app-$device_abi-qa.apk"
 "$adb_bin" install -r app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk
 # Tests reset their own fixtures using app permissions; MIUI may forbid shell pm clear.
 "$adb_bin" shell am instrument -w -r "$test_package/androidx.test.runner.AndroidJUnitRunner" | tee "$out/instrumentation.txt"

@@ -28,15 +28,18 @@ def instrumentation(variant):
     return {'passed': bool(match), 'tests': int(match[1]) if match else 0}
 
 apks = {}
-for variant, name in [('debug', 'app-debug.apk'), ('release', 'app-release-unsigned.apk'), ('qa', 'app-qa.apk'), ('benchmark', 'app-benchmark.apk')]:
+variants = [(variant, f'app-{abi}-{variant}' + ('-unsigned' if variant == 'release' else '') + '.apk')
+            for variant in ('debug', 'release', 'qa', 'benchmark')
+            for abi in ('arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64')]
+for variant, name in variants:
     path = root / f'app/build/outputs/apk/{variant}/{name}'
-    apks[variant] = {'path': str(path.relative_to(root)), 'bytes': path.stat().st_size,
+    apks[name] = {'path': str(path.relative_to(root)), 'bytes': path.stat().st_size,
                      'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
     if variant == 'release':
         import zipfile
         with zipfile.ZipFile(path) as apk:
             dex = b''.join(apk.read(n) for n in apk.namelist() if re.fullmatch(r'classes\d*\.dex', n))
-        apks[variant]['demoEntryRemoved'] = '体验校园助手'.encode() not in dex
+        apks[name]['demoEntryRemoved'] = '体验校园助手'.encode() not in dex
 
 offline_file = root / 'artifacts/qa/offline/offline-result.json'
 offline = json.loads(offline_file.read_text()) if offline_file.exists() else {}
@@ -46,7 +49,7 @@ report = {'version': version, 'generatedAt': datetime.now(timezone.utc).isoforma
           'unit': unit, 'lint': lint_counts, 'qa': instrumentation('qa'), 'benchmark': instrumentation('benchmark'),
           'offline': offline, 'apks': apks,
           'scope': 'emulator and local builds; physical device, release signing and live school services not revalidated'}
-report['passed'] = all(logs.values()) and unit['tests'] > 0 and unit['errors'] == unit['failures'] == unit['skipped'] == 0 and not any(lint_counts.get(x, 0) for x in ['Error', 'Fatal']) and report['qa']['passed'] and report['benchmark']['passed'] and offline.get('cachedCourseVisible', False) and offline.get('weekendPreferenceSurvivedProcessDeath', False) and apks['release']['demoEntryRemoved']
+report['passed'] = all(logs.values()) and unit['tests'] > 0 and unit['errors'] == unit['failures'] == unit['skipped'] == 0 and not any(lint_counts.get(x, 0) for x in ['Error', 'Fatal']) and report['qa']['passed'] and report['benchmark']['passed'] and offline.get('cachedCourseVisible', False) and offline.get('weekendPreferenceSurvivedProcessDeath', False) and all(data.get('demoEntryRemoved', True) for data in apks.values())
 (out / 'summary.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n')
 print(json.dumps({'passed': report['passed'], 'unit': unit, 'lint': lint_counts, 'qa': report['qa'], 'benchmark': report['benchmark']}, ensure_ascii=False))
 if not report['passed']:

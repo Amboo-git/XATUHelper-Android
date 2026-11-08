@@ -32,7 +32,8 @@ case "$variant" in
     ;;
   *) echo "Usage: ADB=/path/to/adb $0 [qa|benchmark]" >&2; exit 2 ;;
 esac
-"$adb_bin" install -r "app/build/outputs/apk/$variant/app-$variant.apk"
+device_abi=$("$adb_bin" shell getprop ro.product.cpu.abi | tr -d '\r')
+"$adb_bin" install -r "app/build/outputs/apk/$variant/app-$device_abi-$variant.apk"
 "$adb_bin" install -r "$test_apk"
 "$adb_bin" shell pm clear "$package"
 mkdir -p "artifacts/qa/$variant"

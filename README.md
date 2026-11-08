@@ -52,8 +52,10 @@
 ./gradlew :app:assembleRelease
 ```
 
-Debug APK：`app/build/outputs/apk/debug/app-debug.apk`。
-Release APK：`app/build/outputs/apk/release/app-release-unsigned.apk`；开启 R8 和资源压缩，需要你自己的发布签名后才能分发。
+Debug APK：`app/build/outputs/apk/debug/app-<ABI>-debug.apk`。
+Release APK：`app/build/outputs/apk/release/app-<ABI>-release-unsigned.apk`；开启 R8 和资源压缩，需要你自己的发布签名后才能分发。
+
+APK 按 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64` 分别构建。构建完成后运行 `python3 scripts/package-release.py`，输出到 `dist/<版本号>/per-abi/`；发布文件名使用 `xatune-<版本号>-<架构>-devsigned.apk`，架构中的连字符转为下划线。发布说明使用该目录生成的 `release-notes.md`，附带 `SHA256SUMS` 校验文件。
 
 Debug 与 Release 交付包均无示例账号入口。示例数据仅用于独立 QA／Benchmark 自动化测试包，不作为交付安装包。旧调试版本已保存的示例账号在交付版本启动时清理，真实账号不受影响。
 
