@@ -93,7 +93,8 @@ class TimetableRepository(val store: LocalStore, private val vault: SecretVault,
     }
     suspend fun setMonday(account: String, semester: String, date: LocalDate) { store.monday(account, semester, mondayOf(date).toString()) }
     suspend fun calibrate(table: Timetable, monday: LocalDate): Timetable = withContext(Dispatchers.IO) {
-        table.copy(monday = mondayOf(monday).toString()).also { store.save(it) }
+        val base = store.baseTable(table.account, table.semester.id, table.kind) ?: table
+        base.copy(monday = mondayOf(monday).toString()).also { store.save(it) }
     }
     suspend fun logout() = withContext(Dispatchers.IO) { sessionMutex.withLock {
         shell = null; attempts.clear(); cookies.clear(); store.clear()

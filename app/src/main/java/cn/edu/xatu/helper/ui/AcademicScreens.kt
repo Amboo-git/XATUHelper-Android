@@ -228,6 +228,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable fun SettingsScreen(state: UiState, onBack: () -> Unit, onCalibrate: () -> Unit, onRelogin: () -> Unit, onLogout: () -> Unit, onReminders: () -> Unit = {}, onWidgets: () -> Unit = {}, onWeekend: (Boolean) -> Unit = {}, onDiagnostics: (Boolean) -> Unit = {}, campus: CampusState = CampusState(), onAutoElectric: (Boolean) -> Unit = {}, update: UpdateUi = UpdateUi(), onCheckUpdates: () -> Unit = {}, onCheckinLocation: () -> Unit = {}) {
     var confirmLogout by remember { mutableStateOf(false) }
+    var privacy by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     var copied by remember { mutableStateOf(false) }
@@ -273,6 +274,7 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
                 item { ServiceRow("选择位置", location.coordinate?.let { "%.6f, %.6f".format(java.util.Locale.ROOT, it.latitude, it.longitude) } ?: "未选择", Icons.Default.LocationOn, Modifier.testTag("checkinLocationPicker"), onClick = onCheckinLocation) }
                 item { InfoPanel("先选择位置，再开启传入定位。所选坐标保存在本机，仅用于签到网页。") }
             }
+            item { ServiceRow("隐私政策", "查看数据使用与删除方式", Icons.Default.PrivacyTip) { privacy = true } }
             item { SectionHeading("关于") }
             item { ContentCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -296,5 +298,6 @@ private fun updated(at: Long): String = java.time.Instant.ofEpochMilli(at).atZon
             item { Spacer(Modifier.height(12.dp)); OutlinedButton(onClick = { confirmLogout = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("logout"), colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)) { Text("退出登录") } }
         }
     }
+    if (privacy) PrivacyPolicyDialog { privacy = false }
     if (confirmLogout) AlertDialog(onDismissRequest = { confirmLogout = false }, icon = { Icon(Icons.Default.Logout, null) }, title = { Text("退出登录？") }, text = { Text("将清除此设备上的账号、登录状态、课表和教务缓存。") }, confirmButton = { TextButton(onClick = { confirmLogout = false; onLogout() }) { Text("确认退出") } }, dismissButton = { TextButton(onClick = { confirmLogout = false }) { Text("取消") } })
 }

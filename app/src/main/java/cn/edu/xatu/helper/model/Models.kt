@@ -15,7 +15,7 @@ fun weekOf(start: LocalDate, date: LocalDate): Int = (Math.floorDiv(ChronoUnit.D
 data class Semester(val id: String, val name: String, val startDate: String? = null)
 enum class TableKind(val wire: String, val title: String) { STUDENT("std", "学生课表"), CLASS("class", "班级课表") }
 data class Shell(val studentId: String, val classId: String?, val semesterId: String, val tagId: String, val projectId: String)
-data class Course(val key: String, val name: String, val teacher: String, val room: String, val day: Int, val period: Int, val weeks: List<Int>)
+data class Course(val key: String, val name: String, val teacher: String, val room: String, val day: Int, val period: Int, val weeks: List<Int>, val localId: String? = null, val fixedDates: Boolean = false)
 data class CourseBlock(val key: String, val name: String, val teacher: String, val room: String, val day: Int, val start: Int, val end: Int, val weeks: List<Int>) {
     val id: String get() = "$key|$day|$start|$room|$teacher"
     val periodText: String get() = if (start == end) "第 $start 节" else "第 $start–$end 节"

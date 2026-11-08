@@ -84,6 +84,8 @@ import java.time.format.DateTimeFormatter
 }
 
 @Composable internal fun LoginScreen(state: UiState, onLogin: (String, String) -> Unit, onWeb: (String) -> Unit, onDemo: (() -> Unit)?, onBack: (() -> Unit)?) {
+    var privacy by remember { mutableStateOf(false) }
+    if (privacy) PrivacyPolicyDialog { privacy = false }
     var account by rememberSaveable { mutableStateOf(state.account.takeUnless { it == "__demo__" }.orEmpty()) }
     var password by remember { mutableStateOf("") }
     var visible by remember { mutableStateOf(false) }
@@ -110,6 +112,7 @@ import java.time.format.DateTimeFormatter
             OutlinedButton(onClick = { password = ""; onWeb(account) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth().height(48.dp)) { Icon(Icons.Default.Language, null); Spacer(Modifier.width(8.dp)); Text("使用网页登录") }
             InfoPanel("需要验证码或动态码时，可在学校网页完成认证。凭据仅加密保存在此设备，直接连接学校服务器。", Icons.Default.Lock)
             if (BuildConfig.DEMO_ENABLED) onDemo?.let { demo -> TextButton(onClick = demo, enabled = !state.busy, modifier = Modifier.fillMaxWidth().testTag("demo")) { Text("体验校园助手 · 调试版") } }
+            TextButton(onClick = { privacy = true }, modifier = Modifier.fillMaxWidth()) { Text("隐私政策") }
             onBack?.let { TextButton(onClick = it, modifier = Modifier.fillMaxWidth()) { Text("返回离线课表") } }
         }
     }
@@ -122,6 +125,10 @@ import java.time.format.DateTimeFormatter
     var academicScope by rememberSaveable { mutableStateOf<String?>(null) }
     var showCalibration by remember { mutableStateOf(false) }
     var course by remember { mutableStateOf<CourseBlock?>(null) }
+    var editRequest by remember { mutableStateOf<CourseEditRequest?>(null) }
+    var history by remember { mutableStateOf(false) }
+    val canEdit = state.table != null && state.kind == TableKind.STUDENT && !state.busy
+    LaunchedEffect(state.account, state.selectedSemester, state.kind) { course = null; editRequest = null; history = false }
     val requestedPage by model.destination.collectAsStateWithLifecycle()
     LaunchedEffect(requestedPage) {
         val request = requestedPage
@@ -152,6 +159,14 @@ import java.time.format.DateTimeFormatter
         "exams", "grades", "plan" -> AcademicScreen(when (destination) { "exams" -> AcademicKind.EXAMS; "grades" -> AcademicKind.GRADES; else -> AcademicKind.PLAN }, state, model, { page = null }, onRelogin, { page = if (destination == "plan") "planWeb" else "eams" }, initialScope = academicScope)
         else -> Scaffold(topBar = {
         TopAppBar(title = { Text(titles[tab], fontWeight = FontWeight.SemiBold) }, actions = {
+            if (tab == 1 && canEdit) {
+                IconButton(onClick = { editRequest = CourseEditRequest(EditKind.ADD) }) { Icon(Icons.Default.Add, "添加课程") }
+                IconButton(onClick = { history = true }) {
+                    BadgedBox(badge = { if (state.pendingEdits.isNotEmpty()) Badge { Text(state.pendingEdits.size.toString()) } }) {
+                        Icon(Icons.Default.History, "我的课表修改")
+                    }
+                }
+            }
             if (tab == 1) IconButton(onClick = { showCalibration = true }, enabled = !state.busy) { Icon(Icons.Default.EditCalendar, "校准周次") }
             if (tab != 2) IconButton(onClick = model::refresh, enabled = !state.busy && !state.demo) { Icon(Icons.Default.Refresh, "刷新课表") }
             if (tab == 2) IconButton(onClick = { page = "settings" }) { Icon(Icons.Default.Settings, "设置") }
@@ -180,8 +195,12 @@ import java.time.format.DateTimeFormatter
                     .togetherWith(fadeOut(tween(AppMotion.ExitMillis)))
                     .using(SizeTransform(clip = false))
             }, label = "mainTabs") { activeTab -> when (activeTab) {
-                0 -> HomeScreen(state, { tab = 1 }, { course = it }, { model.campus?.dismissError(); page = it }, campusState)
-                1 -> TimetableScreen(state, model, { course = it })
+                0 -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(isRefreshing = state.busy, onRefresh = model::refresh) {
+                    HomeScreen(state, { tab = 1 }, { course = it }, { model.campus?.dismissError(); page = it }, campusState)
+                }
+                1 -> androidx.compose.material3.pulltorefresh.PullToRefreshBox(isRefreshing = state.busy, onRefresh = model::refresh) {
+                    TimetableScreen(state, model, { course = it })
+                }
                 else -> CampusScreen { model.campus?.dismissError(); page = it }
             } }
         }
@@ -219,11 +238,18 @@ import java.time.format.DateTimeFormatter
                 DetailRow(Icons.Default.LocationOn, selected.room.ifEmpty { "未提供教室" })
                 DetailRow(Icons.Default.Person, selected.teacher.ifEmpty { "未提供教师" })
                 DetailRow(Icons.Default.DateRange, "上课周次：${selected.weeks.joinToString("、")}")
+                if (canEdit) Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    TextButton(onClick = { editRequest = CourseEditRequest(EditKind.MOVE, selected); course = null }) { Text("修改课程") }
+                    TextButton(onClick = { editRequest = CourseEditRequest(EditKind.REMOVE, selected); course = null }) { Text("移除课程") }
+                }
                 FilledTonalButton(onClick = { course = null }) { Text("关闭详情") }
-                Text("课程号 ${selected.key}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                if (!selected.key.startsWith("local-")) Text("课程号 ${selected.key}", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
+
+    editRequest?.let { request -> if (state.table != null) TimetableEditDialog(state, request, { editRequest = null }, model::saveEdits) }
+    if (history) TimetableHistoryDialog(state, { history = false }, model::saveEdits)
 
     if (showCalibration) {
         var date by remember { mutableStateOf(state.table?.monday.orEmpty()) }

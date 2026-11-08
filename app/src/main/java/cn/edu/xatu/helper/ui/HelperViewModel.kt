@@ -15,6 +15,7 @@ fun academicKey(kind: AcademicKind, scope: String) = "${kind.name}:$scope"
 data class UiState(
     val academic: Map<String, AcademicUi> = emptyMap(), val notice: AcademicNotice? = null, val allGrades: Boolean = false,
     val showWeekend: Boolean = true, val showDiagnostics: Boolean = false, val currentSemester: String = "",
+    val edits: List<TimetableEdit> = emptyList(), val pendingEdits: Map<String, List<Int>> = emptyMap(), val baseTable: Timetable? = null,
     val starting: Boolean = true, val account: String = "", val table: Timetable? = null,
     val semesters: List<Semester> = emptyList(), val selectedSemester: String = "", val kind: TableKind = TableKind.STUDENT,
     val week: Int = 1, val busy: Boolean = false, val error: String? = null,
@@ -69,9 +70,12 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
                 if (!BuildConfig.DEMO_ENABLED && repository.store.account() == "__demo__") repository.logout()
                 val account = repository.store.account()
                 val (semester, kind) = repository.store.selection()
-                val table = repository.store.table(account, semester, kind)
+                val base = repository.store.baseTable(account, semester, kind)
+                val edits = if (kind == TableKind.STUDENT) repository.store.edits(account, semester) else emptyList()
+                val edited = base?.let { editTimetable(it, edits) }
+                val table = edited?.table
                 val demo = account == "__demo__" && BuildConfig.DEMO_ENABLED
-                mutable.value = UiState(starting = false, account = account, table = table, semesters = repository.store.semesters(), selectedSemester = semester, kind = kind,
+                mutable.value = UiState(starting = false, account = account, table = table, baseTable = base, edits = edits, pendingEdits = edited?.pending.orEmpty(), semesters = repository.store.semesters(), selectedSemester = semester, kind = kind,
                     week = table?.let { weekOf(LocalDate.parse(it.monday), schoolToday()) } ?: 1, demo = demo,
                     currentSemester = repository.store.currentSemester(account),
                     showWeekend = repository.store.extra("showWeekend", Boolean::class.javaObjectType) ?: true,
@@ -120,10 +124,14 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
     }
     fun closeWeb() { mutable.update { it.copy(showWebLogin = false) } }
     fun webError(message: String) { mutable.update { it.copy(error = message) } }
-    private suspend fun accept(table: Timetable) {
+    private suspend fun accept(incoming: Timetable) {
+        val base = repository.store.baseTable(incoming.account, incoming.semester.id, incoming.kind) ?: incoming
+        val edits = if (base.kind == TableKind.STUDENT) repository.store.edits(base.account, base.semester.id) else emptyList()
+        val edited = editTimetable(base, edits)
+        val table = edited.table
         val semesters = repository.store.semesters()
         val currentSemester = repository.store.currentSemester(table.account)
-        mutable.update { it.copy(allGrades = if (it.account == table.account) it.allGrades else false, academic = if (it.account == table.account) it.academic else emptyMap(), account = table.account, currentSemester = currentSemester, webAccount = table.account, table = table, semesters = semesters, selectedSemester = table.semester.id, kind = table.kind, needsLogin = false, demo = BuildConfig.DEMO_ENABLED && table.account == "__demo__", week = weekOf(LocalDate.parse(table.monday), schoolToday())) }
+        mutable.update { it.copy(allGrades = if (it.account == table.account) it.allGrades else false, academic = if (it.account == table.account) it.academic else emptyMap(), account = table.account, currentSemester = currentSemester, webAccount = table.account, table = table, baseTable = base, edits = edits, pendingEdits = edited.pending, semesters = semesters, selectedSemester = table.semester.id, kind = table.kind, needsLogin = false, demo = BuildConfig.DEMO_ENABLED && table.account == "__demo__", week = weekOf(LocalDate.parse(table.monday), schoolToday())) }
         warmExams()
         campus?.load()
         runCatching { syncSystems() }
@@ -157,6 +165,16 @@ class HelperViewModel(private val repository: TimetableRepository, campusReposit
         val s = state.value
         repository.setMonday(s.account, s.selectedSemester, start)
         s.table?.let { accept(repository.calibrate(it, start)) } ?: accept(repository.refresh(s.account, s.selectedSemester, s.kind))
+    } }
+    fun saveEdits(scope: Timetable, edits: List<TimetableEdit>) { action {
+        val s = state.value
+        require(s.account == scope.account && s.selectedSemester == scope.semester.id && s.kind == TableKind.STUDENT) { "当前课表已切换，请重新编辑。" }
+        val base = repository.store.baseTable(s.account, s.selectedSemester, s.kind) ?: error("当前课表无法修改。")
+        require(base == scope) { "课表已变化，请关闭后重新编辑。" }
+        editTimetable(base, edits)
+        repository.store.edits(s.account, s.selectedSemester, edits)
+        accept(base)
+        mutable.update { it.copy(week = s.week) }
     } }
     fun logout() { action {
         academicJobs.values.forEach { it.cancel() }; academicJobs.clear()

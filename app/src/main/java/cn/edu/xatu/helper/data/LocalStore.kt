@@ -82,7 +82,10 @@ class LocalStore(context: Context) {
     }
     suspend fun semesters(): List<Semester> = runCatching { json.fromJson(settings.data.first()[stringPreferencesKey("semesters")], Array<Semester>::class.java)?.toList() }.getOrNull().orEmpty()
     suspend fun semesters(value: List<Semester>) { settings.edit { it[stringPreferencesKey("semesters")] = json.toJson(value) } }
-    suspend fun table(account: String, semester: String, kind: TableKind): Timetable? = database.tables().find(account, semester, kind.name)?.let { runCatching { json.fromJson(it.payload, Timetable::class.java) }.getOrNull() }
+    suspend fun baseTable(account: String, semester: String, kind: TableKind): Timetable? = database.tables().find(account, semester, kind.name)?.let { runCatching { json.fromJson(it.payload, Timetable::class.java) }.getOrNull() }
+    suspend fun table(account: String, semester: String, kind: TableKind): Timetable? = baseTable(account, semester, kind)?.let { editTimetable(it, edits(account, semester)).table }
+    suspend fun edits(account: String, semester: String): List<TimetableEdit> = extra("edits:$account:$semester", Array<TimetableEdit>::class.java)?.toList().orEmpty()
+    suspend fun edits(account: String, semester: String, value: List<TimetableEdit>) { extra("edits:$account:$semester", value) }
     suspend fun save(table: Timetable) { database.tables().save(CachedTable(table.account, table.semester.id, table.kind.name, json.toJson(table), table.fetchedAt)) }
     suspend fun monday(account: String, semester: String): String? = settings.data.first()[stringPreferencesKey("monday:$account:$semester")]
     suspend fun monday(account: String, semester: String, value: String) { settings.edit { it[stringPreferencesKey("monday:$account:$semester")] = value } }
@@ -95,7 +98,7 @@ class LocalStore(context: Context) {
     suspend fun history(account: String, dorm: String): List<DailyBalance> = database.electricity().history(account, dorm).map { DailyBalance(it.day, it.balance) }
     suspend fun record(account: String, value: Electricity) { database.electricity().record(ElectricDaily(account, value.dorm.key, schoolToday().toString(), value.balance)) }
     suspend fun currentSemester(account: String): String = extra("current:$account", String::class.java) ?: selection().first
-    suspend fun clear() { database.electricity().clear(); database.tables().clear(); database.academic().clear(); settings.edit { it.clear() } }
+    suspend fun clear() { database.electricity().clear(); database.tables().clear(); database.academic().clear(); settings.edit { prefs -> prefs.asMap().keys.filterNot { it.name.startsWith("edits:") }.forEach { prefs.remove(it) } } }
 }
 
 data class Credentials(val account: String, val password: String)
