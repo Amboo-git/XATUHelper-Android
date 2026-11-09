@@ -13,14 +13,14 @@ val gitCommit = providers.exec {
 }.standardOutput.asText.map { it.trim().ifEmpty { "unknown" } }.get()
 
 android {
-    namespace = "cn.edu.xatu.helper"
+    namespace = "com.xatune.app"
     compileSdk = 36
     buildToolsVersion = "36.0.0"
     defaultConfig {
-        applicationId = "cn.edu.xatu.helper"
+        applicationId = "com.xatune.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
+        versionCode = 27
         versionName = "1.1.7"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")

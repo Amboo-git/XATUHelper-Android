@@ -10,8 +10,8 @@ if [[ "$("$adb_bin" shell getprop ro.kernel.qemu | tr -d '\r')" == 1 ]]; then
   echo "Use device-tests.sh for emulators." >&2
   exit 2
 fi
-package=cn.edu.xatu.helper.qa
-test_package=cn.edu.xatu.helper.qa.test
+package=com.xatune.app.qa
+test_package=com.xatune.app.qa.test
 out=artifacts/qa/physical
 mkdir -p "$out"
 ./gradlew :app:assembleQa :app:assembleQaAndroidTest --offline --console plain --max-workers=1

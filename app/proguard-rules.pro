@@ -1,10 +1,10 @@
 -keepattributes Signature
 -keepclassmembers class * { @com.google.gson.annotations.SerializedName <fields>; }
--keep class cn.edu.xatu.helper.model.** { *; }
+-keep class com.xatune.app.model.** { *; }
 # Preserve the encrypted session JSON contract across debug/release updates.
--keep class cn.edu.xatu.helper.data.Credentials { *; }
--keep class cn.edu.xatu.helper.data.CookieRecord { *; }
--keep class cn.edu.xatu.helper.data.Secrets { *; }
+-keep class com.xatune.app.data.Credentials { *; }
+-keep class com.xatune.app.data.CookieRecord { *; }
+-keep class com.xatune.app.data.Secrets { *; }
 # Keep the local update-cache JSON stable across optimized app updates.
--keep class cn.edu.xatu.helper.data.AppRelease { *; }
--keep class cn.edu.xatu.helper.data.UpdateCache { *; }
+-keep class com.xatune.app.data.AppRelease { *; }
+-keep class com.xatune.app.data.UpdateCache { *; }

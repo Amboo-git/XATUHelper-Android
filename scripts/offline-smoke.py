@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--adb', default=os.environ.get('ADB', 'adb'))
-parser.add_argument('--package', default='cn.edu.xatu.helper.qa')
+parser.add_argument('--package', default='com.xatune.app.qa')
 args = parser.parse_args()
 if not os.environ.get('ANDROID_SERIAL'):
     devices = subprocess.check_output([args.adb, 'devices'], text=True, timeout=15)
@@ -50,7 +50,7 @@ original_night = adb('shell', 'cmd', 'uimode', 'night').strip().split()[-1]
 original_wifi = adb('shell', 'settings', 'get', 'global', 'wifi_on').strip()
 original_data = adb('shell', 'settings', 'get', 'global', 'mobile_data').strip()
 try:
-    adb('shell', 'am', 'start', '-W', '-n', args.package + '/cn.edu.xatu.helper.MainActivity')
+    adb('shell', 'am', 'start', '-W', '-n', args.package + '/com.xatune.app.MainActivity')
     current = list(nodes())
     labels = {n.get('text', '') for n in current}
     if '体验校园助手 · 调试版' in labels:
@@ -70,7 +70,7 @@ try:
     adb('shell', 'am', 'force-stop', args.package)
     adb('shell', 'svc', 'wifi', 'disable')
     adb('shell', 'svc', 'data', 'disable')
-    cold = adb('shell', 'am', 'start', '-W', '-n', args.package + '/cn.edu.xatu.helper.MainActivity')
+    cold = adb('shell', 'am', 'start', '-W', '-n', args.package + '/com.xatune.app.MainActivity')
     find('今天的安排')
     tap('课程表')
     find('高等数学')

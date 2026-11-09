@@ -13,7 +13,7 @@ public final class GenerateCoursePalette {
 
     public static void main(String[] args) {
         System.out.print("""
-                package cn.edu.xatu.helper.ui
+                package com.xatune.app.ui
 
                 import androidx.compose.ui.graphics.Color
 

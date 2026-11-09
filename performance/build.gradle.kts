@@ -3,8 +3,9 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 android {
-    namespace = "cn.edu.xatu.helper.performance"
+    namespace = "com.xatune.app.performance"
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
     targetProjectPath = ":app"
     defaultConfig {
         minSdk = 26

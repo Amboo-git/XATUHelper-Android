@@ -72,7 +72,7 @@ Debug 与 Release 交付包均无示例账号入口。示例数据仅用于独�
 ## 结构
 
 ```text
-app/src/main/java/cn/edu/xatu/helper/
+app/src/main/java/com/xatune/app/
   data/       CAS、Cookie、网络、解析、Room、DataStore、Keystore、Repository
   model/      课程、学期、周次、作息与重叠布局
   ui/         MD3 界面、ViewModel、校园 WebView

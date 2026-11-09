@@ -19,14 +19,14 @@ fi
 case "$variant" in
   qa|debug)
     variant=qa
-    package=cn.edu.xatu.helper.qa
-    test_package=cn.edu.xatu.helper.qa.test
+    package=com.xatune.app.qa
+    test_package=com.xatune.app.qa.test
     ./gradlew :app:assembleQa :app:assembleQaAndroidTest --console plain
     test_apk=app/build/outputs/apk/androidTest/qa/app-qa-androidTest.apk
     ;;
   benchmark)
-    package=cn.edu.xatu.helper.benchmark
-    test_package=cn.edu.xatu.helper.performance
+    package=com.xatune.app.benchmark
+    test_package=com.xatune.app.performance
     ./gradlew :app:assembleBenchmark :performance:assembleBenchmark --console plain
     test_apk=performance/build/outputs/apk/benchmark/performance-benchmark.apk
     ;;

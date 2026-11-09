@@ -55,7 +55,7 @@ for abi in abis:
     verification = subprocess.check_output([str(build_tools / 'apksigner'), 'verify', '--verbose', '--print-certs', str(signed)], text=True)
     (out / f'{stem}-signature-verification.txt').write_text(verification)
     badging = subprocess.check_output([str(build_tools / 'aapt'), 'dump', 'badging', str(signed)], text=True)
-    assert "name='cn.edu.xatu.helper'" in badging
+    assert "name='com.xatune.app'" in badging
     assert f"versionCode='{version_code}'" in badging and f"versionName='{version}'" in badging
     assert 'application-debuggable' not in badging
     (out / f'{stem}-apk-metadata.txt').write_text(badging)
