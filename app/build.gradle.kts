@@ -20,7 +20,7 @@ android {
         applicationId = "com.xatune.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 27
+        versionCode = 28
         versionName = "1.1.7"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
