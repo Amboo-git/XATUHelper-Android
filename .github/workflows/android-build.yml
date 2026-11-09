@@ -43,14 +43,51 @@ jobs:
       - name: Build unsigned APKs
         run: ./gradlew --no-daemon --stacktrace :app:assembleRelease
 
-      - name: Upload unsigned APKs
-        uses: actions/upload-artifact@v6
+      - name: Name unsigned APKs
+        id: apks
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk_dir=app/build/outputs/apk/release
+          version_name=$(jq -er '.elements[0].versionName' "$apk_dir/output-metadata.json")
+          version_code=$(jq -er '.elements[0].versionCode' "$apk_dir/output-metadata.json")
+          commit=$(git rev-parse HEAD)
+          prefix="XATune-v${version_name}.r${version_code}.${commit:0:7}"
+          mkdir -p artifacts
+          for abi in arm64-v8a armeabi-v7a x86 x86_64; do
+            cp "$apk_dir/app-${abi}-release-unsigned.apk" "artifacts/${prefix}-${abi}.apk"
+          done
+          echo "prefix=$prefix" >> "$GITHUB_OUTPUT"
+
+      # Each upload contains exactly one APK, with no surrounding ZIP archive.
+      - name: Upload arm64-v8a APK
+        uses: actions/upload-artifact@v7
         with:
-          name: unsigned-apks-${{ github.sha }}
-          path: |
-            app/build/outputs/apk/release/app-arm64-v8a-release-unsigned.apk
-            app/build/outputs/apk/release/app-armeabi-v7a-release-unsigned.apk
-            app/build/outputs/apk/release/app-x86-release-unsigned.apk
-            app/build/outputs/apk/release/app-x86_64-release-unsigned.apk
+          path: artifacts/${{ steps.apks.outputs.prefix }}-arm64-v8a.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload armeabi-v7a APK
+        uses: actions/upload-artifact@v7
+        with:
+          path: artifacts/${{ steps.apks.outputs.prefix }}-armeabi-v7a.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86 APK
+        uses: actions/upload-artifact@v7
+        with:
+          path: artifacts/${{ steps.apks.outputs.prefix }}-x86.apk
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload x86_64 APK
+        uses: actions/upload-artifact@v7
+        with:
+          path: artifacts/${{ steps.apks.outputs.prefix }}-x86_64.apk
+          archive: false
           if-no-files-found: error
           retention-days: 14
