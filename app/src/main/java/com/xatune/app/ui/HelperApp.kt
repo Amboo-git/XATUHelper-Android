@@ -42,7 +42,7 @@ import java.time.LocalDate
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-@Composable fun HelperApp(model: HelperViewModel) {
+@Composable fun HelperApp(model: HelperViewModel, announcements: AnnouncementViewModel? = null) {
     val state by model.state.collectAsStateWithLifecycle()
     val update by model.updateState.collectAsStateWithLifecycle()
     var relogin by rememberSaveable { mutableStateOf(false) }
@@ -61,6 +61,9 @@ import java.time.format.DateTimeFormatter
     }
     }
     UpdateNotification(update, model::dismissUpdate, model::updateLinkFailed)
+    if (!state.starting && !state.showWebLogin && state.notice == null && update.offer == null) {
+        announcements?.let { AnnouncementNotification(it) }
+    }
 }
 
 @Composable internal fun UpdateNotification(update: UpdateUi, onDismiss: () -> Unit, onLinkFailed: () -> Unit) {

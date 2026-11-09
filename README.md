@@ -90,3 +90,13 @@ performance/          独立进程的优化构建 UIAutomator 检查
 ## 许可
 
 MIT。课表协议与解析规则参考原 XATUHelper；保留原作者版权声明，见 [LICENSE](LICENSE)。
+
+## 公告服务
+
+App 启动或回到前台时获取公告，点击查看全文，关闭后在本机记录已读。Debug 默认连接 `http://localhost:8765`，可使用 `adb reverse tcp:8765 tcp:8765` 连接电脑上的服务。Release 默认关闭公告请求，配置服务地址后启用：
+
+```sh
+./gradlew :app:assembleRelease -PannouncementsBaseUrl=https://你的服务域名
+```
+
+服务使用 `GET /v1/announcements?platform=android`，返回 `announcements` 数组及 Unix 毫秒时间戳 `server_time`。每条公告包含 `id`、`title`、`body`、`platforms`、`published_at` 和可为空的 `expires_at`。已读记录独立于校园账号；请求不使用学校 Cookie 或账号信息。正式版本只接受 HTTPS 地址。
