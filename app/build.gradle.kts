@@ -20,9 +20,10 @@ android {
         applicationId = "com.xatune.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 29
+        versionCode = 30
         versionName = "1.1.7"
         buildConfigField("String", "GIT_COMMIT", "\"$gitCommit\"")
+        buildConfigField("String", "ANNOUNCEMENTS_BASE_URL", "\"${providers.gradleProperty("announcementsBaseUrl").orElse("").get()}\"")
         buildConfigField("boolean", "DEMO_ENABLED", "false")
         buildConfigField("boolean", "WEB_DIAGNOSTICS", "false")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -41,7 +42,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildTypes {
-        debug { buildConfigField("boolean", "DEMO_ENABLED", "false") }
+        debug {
+            buildConfigField("boolean", "DEMO_ENABLED", "false")
+            buildConfigField("String", "ANNOUNCEMENTS_BASE_URL", "\"${providers.gradleProperty("announcementsBaseUrl").orElse("http://localhost:8765").get()}\"")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true

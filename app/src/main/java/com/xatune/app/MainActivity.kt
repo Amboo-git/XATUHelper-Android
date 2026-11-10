@@ -29,6 +29,8 @@ class MainActivity : ComponentActivity() {
         })[HelperViewModel::class.java]
         helperModel = model
         model.openDestination(intent.getStringExtra("open_page")); intent.removeExtra("open_page")
-        setContent { HelperTheme { HelperApp(model) } }
+        val announcements = ViewModelProvider(this)[AnnouncementViewModel::class.java]
+        lifecycle.addObserver(announcements)
+        setContent { HelperTheme { HelperApp(model, announcements) } }
     }
 }
